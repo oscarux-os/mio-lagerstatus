@@ -38,7 +38,7 @@ export function LagerstatusSimulator() {
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-background">
-      <aside className="lg:w-72 lg:shrink-0 lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto bg-white border-b lg:border-b-0 lg:border-r border-[#e0ddd7] p-6 flex flex-col gap-6">
+      <aside className="order-last lg:order-first lg:w-72 lg:shrink-0 lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto bg-white border-t lg:border-t-0 lg:border-r border-[#e0ddd7] p-6 flex flex-col gap-6">
         <div className="h-px bg-[#ebebeb]" />
 
         <fieldset className="flex flex-col gap-2">

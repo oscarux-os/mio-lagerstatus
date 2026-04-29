@@ -44,7 +44,7 @@ Logiken skiljer sig mellan beställningsvaror och snabbrörliga. Beställningsva
 
 **Finns i vald butik**
 - Stockrad: "X st i lager hos [Butik]"
-- Leveransrad 1: Hämta i butik – inom 60 min · 0 kr
+- Leveransrad 1: Hämta i butik inom 60 min · 0 kr
 - Leveransrad 2: Hemleverans inom 3–9 dagar · 595 kr
 - Båda leveransalternativen visas eftersom källan är BL — hemleverans hör hemma här, inte i Ruta 2
 
@@ -69,7 +69,7 @@ Logiken skiljer sig mellan beställningsvaror och snabbrörliga. Beställningsva
 
 **Finns i vald butik**
 - Stockrad: "X st i lager hos [Butik]"
-- Leveransrad 1: Hämta i butik – inom 60 min · 0 kr
+- Leveransrad 1: Hämta i butik inom 60 min · 0 kr
 - Leveransrad 2: Hemleverans inom X–X veckor · 595 kr (visas bara om CL/WL inte har bättre alternativ — annars hanteras hemleverans i Ruta 2)
 - Fraktkostnad hämtning: 0 kr
 

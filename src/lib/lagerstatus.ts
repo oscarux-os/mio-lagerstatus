@@ -119,7 +119,7 @@ export function getStoreBox(
           {
             kind: "delivery",
             icon: "store",
-            text: "Hämta i butik – inom 60 minuter",
+            text: "Hämta i butik inom 60 minuter",
             price: "0 kr",
           },
           ...(type === "bestall"
