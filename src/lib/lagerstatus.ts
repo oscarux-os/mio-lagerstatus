@@ -172,10 +172,7 @@ export function getStoreBox(
           {
             kind: "delivery",
             icon: "store",
-            text:
-              type === "bestall"
-                ? "Hämta i butik inom 4–8 veckor"
-                : `Hämta i butik ${pickupLeadTime}`,
+            text: "Hämta i butik inom 4–8 veckor",
             price: "0 kr",
           },
           ...(type === "bestall"

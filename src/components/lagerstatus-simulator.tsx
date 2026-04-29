@@ -79,7 +79,7 @@ export function LagerstatusSimulator() {
       <main className="flex-1 p-6 lg:p-10">
         <div className="flex gap-0 border-b border-[#e0ddd7] mb-6">
           <TabBtn active={tab === "produktsida"} onClick={() => setTab("produktsida")}>Produktsida</TabBtn>
-          <TabBtn active={tab === "produktkort"} onClick={() => setTab("produktkort")}>Produktkort</TabBtn>
+          <TabBtn active={tab === "produktkort"} onClick={() => setTab("produktkort")} disabled>Produktkort</TabBtn>
         </div>
 
         {tab === "produktsida" ? (
@@ -149,12 +149,13 @@ function SelectField({
   );
 }
 
-function TabBtn({ active, children, onClick }: { active: boolean; children: React.ReactNode; onClick: () => void }) {
+function TabBtn({ active, disabled, children, onClick }: { active: boolean; disabled?: boolean; children: React.ReactNode; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
       className={`-mb-px px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-        active ? "border-[#111] text-[#111]" : "border-transparent text-[#aaa] hover:text-[#555]"
+        active ? "border-[#111] text-[#111]" : disabled ? "border-transparent text-[#ccc] cursor-not-allowed" : "border-transparent text-[#aaa] hover:text-[#555]"
       }`}
     >
       {children}
