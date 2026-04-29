@@ -39,12 +39,6 @@ export function LagerstatusSimulator() {
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-background">
       <aside className="lg:w-72 lg:shrink-0 lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto bg-white border-b lg:border-b-0 lg:border-r border-[#e0ddd7] p-6 flex flex-col gap-6">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[#999] mb-1">Mio</p>
-          <h1 className="text-xl font-semibold tracking-tight text-[#111]">Lagerstatus</h1>
-          <p className="text-sm text-[#888] mt-1 leading-5">Kombinator för butik och leverans</p>
-        </div>
-
         <div className="h-px bg-[#ebebeb]" />
 
         <fieldset className="flex flex-col gap-2">
