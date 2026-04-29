@@ -1,5 +1,12 @@
 import type { Metadata } from "next";
+import { Source_Sans_3 } from "next/font/google";
 import "./globals.css";
+
+const sourceSans = Source_Sans_3({
+  subsets: ["latin"],
+  weight: ["400", "600"],
+  variable: "--font-source-sans",
+});
 
 export const metadata: Metadata = {
   title: "Mio Lagerstatus",
@@ -12,7 +19,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="sv" className="h-full antialiased">
+    <html lang="sv" className={`h-full antialiased ${sourceSans.variable}`}>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

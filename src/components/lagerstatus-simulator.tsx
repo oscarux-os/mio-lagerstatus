@@ -4,49 +4,16 @@ import { useState } from "react";
 import {
   getCardStatus,
   getOnlineBox,
-  getScenarioLabel,
   getStoreBox,
   onlineOptions,
   storeOptions,
-  type BoxContent,
-  type BoxRow,
   type OnlineState,
   type ProductType,
   type StoreState,
 } from "@/lib/lagerstatus";
+import { ClockIcon, LagerstatusBoxes } from "./status-card";
 
 type Tab = "produktsida" | "produktkort";
-
-const icons = {
-  store: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
-      <path d="M3 9l1-5h16l1 5" />
-      <path d="M3 9h18v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9Z" />
-      <path d="M9 21v-9h6v9" />
-    </svg>
-  ),
-  truck: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
-      <rect x="1" y="3" width="15" height="13" rx="1" />
-      <path d="M16 8h4l3 5v4h-7V8Z" />
-      <circle cx="5.5" cy="18.5" r="2.5" />
-      <circle cx="18.5" cy="18.5" r="2.5" />
-    </svg>
-  ),
-  home: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
-      <path d="m3 12 9-9 9 9" />
-      <path d="M9 21v-9h6v9" />
-      <path d="M3 12v9h18v-9" />
-    </svg>
-  ),
-  clock: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 6v6l4 2" />
-    </svg>
-  ),
-};
 
 export function LagerstatusSimulator() {
   const [tab, setTab] = useState<Tab>("produktsida");
@@ -61,13 +28,7 @@ export function LagerstatusSimulator() {
 
   const storeBox = getStoreBox(storeState, noStoreSelected, type);
   const onlineBox = getOnlineBox(onlineState, type, directToCustomer);
-  const cardStatus = getCardStatus(
-    storeState,
-    onlineState,
-    noStoreSelected,
-    type,
-    directToCustomer,
-  );
+  const cardStatus = getCardStatus(storeState, onlineState, noStoreSelected, type, directToCustomer);
 
   function onTypeChange(nextType: ProductType) {
     setType(nextType);
@@ -76,261 +37,132 @@ export function LagerstatusSimulator() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(134,153,138,0.18),_transparent_32%),linear-gradient(180deg,_#f7f4ee_0%,_#f2eee6_45%,_#ebe6dc_100%)] text-[var(--foreground)]">
-      <div className="mx-auto flex min-h-screen max-w-[1600px] flex-col lg:flex-row">
-        <aside className="border-b border-[var(--border)] bg-white/82 p-6 backdrop-blur lg:sticky lg:top-0 lg:h-screen lg:w-80 lg:border-r lg:border-b-0">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.32em] text-[var(--muted-foreground)]">
-            Mio Lagerstatus
-          </p>
-          <h1 className="max-w-xs text-2xl font-semibold tracking-[-0.04em]">
-            Next.js-kombinator för butik och leverans
-          </h1>
-          <p className="mt-3 max-w-sm text-sm leading-6 text-[var(--muted-foreground)]">
-            Byggd från HTML-prototypen och den uppdaterade logiken i markdown-specen.
-          </p>
+    <div className="min-h-screen flex flex-col lg:flex-row bg-background">
+      <aside className="lg:w-72 lg:shrink-0 lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto bg-white border-b lg:border-b-0 lg:border-r border-[#e0ddd7] p-6 flex flex-col gap-6">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[#999] mb-1">Mio</p>
+          <h1 className="text-xl font-semibold tracking-tight text-[#111]">Lagerstatus</h1>
+          <p className="text-sm text-[#888] mt-1 leading-5">Kombinator för butik och leverans</p>
+        </div>
 
-          <div className="mt-8 space-y-6">
-            <fieldset>
-              <legend className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted-foreground)]">
-                Produkttyp
-              </legend>
-              <div className="grid gap-2">
-                <RadioRow
-                  checked={type === "snabb"}
-                  label="Snabbrörlig"
-                  onChange={() => onTypeChange("snabb")}
-                />
-                <RadioRow
-                  checked={type === "bestall"}
-                  label="Beställningsvara"
-                  onChange={() => onTypeChange("bestall")}
-                />
-              </div>
-            </fieldset>
+        <div className="h-px bg-[#ebebeb]" />
 
-            <fieldset className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-4">
-              <legend className="px-1 text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted-foreground)]">
-                Kontext
-              </legend>
-              <div className="grid gap-3 pt-2">
-                <CheckboxRow
-                  checked={noStoreSelected}
-                  label="Ingen butik vald"
-                  onChange={() => setNoStoreSelected((current) => !current)}
-                />
-                <CheckboxRow
-                  checked={directToCustomer}
-                  label="CL/WL/DI direkt till kund"
-                  onChange={() => setDirectToCustomer((current) => !current)}
-                />
-              </div>
-            </fieldset>
+        <fieldset className="flex flex-col gap-2">
+          <legend className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#999] mb-2">
+            Produkttyp
+          </legend>
+          <RadioPill checked={type === "snabb"} label="Snabbrörlig" onChange={() => onTypeChange("snabb")} />
+          <RadioPill checked={type === "bestall"} label="Beställningsvara" onChange={() => onTypeChange("bestall")} />
+        </fieldset>
 
-            <div>
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted-foreground)]">
-                Butik
-              </label>
-              <select
-                value={storeState}
-                disabled={noStoreSelected}
-                onChange={(event) => setStoreState(event.target.value as StoreState)}
-                className="field"
-              >
-                {storeOptions[type].map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+        <div className="h-px bg-[#ebebeb]" />
 
-            <div className={type === "bestall" && !noStoreSelected && !directToCustomer ? "opacity-45" : ""}>
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted-foreground)]">
-                Online
-              </label>
-              <select
-                value={onlineState}
-                disabled={type === "bestall" && !noStoreSelected && !directToCustomer}
-                onChange={(event) => setOnlineState(event.target.value as OnlineState)}
-                className="field"
-              >
-                {onlineSelectOptions.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+        <div className="flex flex-col gap-4">
+          <SelectField label="Butik" value={storeState} disabled={noStoreSelected} options={storeOptions[type]} onChange={(v) => setStoreState(v as StoreState)} />
+          <div className={type === "bestall" && !noStoreSelected && !directToCustomer ? "opacity-40" : ""}>
+            <SelectField label="Online" value={onlineState} disabled={type === "bestall" && !noStoreSelected && !directToCustomer} options={onlineSelectOptions} onChange={(v) => setOnlineState(v as OnlineState)} />
           </div>
-        </aside>
+        </div>
 
-        <main className="flex-1 p-6 lg:p-10">
-          <div className="rounded-[2rem] border border-white/60 bg-white/65 p-4 shadow-[0_22px_90px_rgba(61,49,30,0.08)] backdrop-blur md:p-6">
-            <div className="flex gap-1 border-b border-[var(--border)]">
-              <TabButton active={tab === "produktsida"} onClick={() => setTab("produktsida")}>
-                Produktsida
-              </TabButton>
-              <TabButton active={tab === "produktkort"} onClick={() => setTab("produktkort")}>
-                Produktkort
-              </TabButton>
-            </div>
+        <div className="h-px bg-[#ebebeb]" />
 
-            <p className="mt-5 text-xs font-medium uppercase tracking-[0.24em] text-[var(--muted-foreground)]">
-              {getScenarioLabel(type, storeState, onlineState, noStoreSelected, directToCustomer)}
+        <div className="flex flex-col gap-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#999]">Kontext</p>
+          <CheckRow checked={noStoreSelected} label="Ingen butik vald" onChange={() => setNoStoreSelected((v) => !v)} />
+          <div className="rounded-lg border border-dashed border-[#ddd] bg-[#fafafa] p-3">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.25em] text-[#bbb] mb-2">Framtid</p>
+            <CheckRow checked={directToCustomer} label="CL/WL/DI direkt till kund" onChange={() => setDirectToCustomer((v) => !v)} />
+          </div>
+        </div>
+      </aside>
+
+      <main className="flex-1 p-6 lg:p-10">
+        <div className="flex gap-0 border-b border-[#e0ddd7] mb-6">
+          <TabBtn active={tab === "produktsida"} onClick={() => setTab("produktsida")}>Produktsida</TabBtn>
+          <TabBtn active={tab === "produktkort"} onClick={() => setTab("produktkort")}>Produktkort</TabBtn>
+        </div>
+
+        {tab === "produktsida" ? (
+          <div className="max-w-sm">
+            <LagerstatusBoxes storeContent={storeBox} onlineContent={onlineBox} />
+          </div>
+        ) : (
+          <div>
+            <p className="text-xs text-[#aaa] mb-5 max-w-md">
+              Markerat kort visar aktuell kombinator-status. Övriga kort är fasta referensprodukter.
             </p>
-
-            {tab === "produktsida" ? (
-              <div className="mt-6 grid max-w-5xl gap-4 xl:grid-cols-[minmax(0,420px)_minmax(0,420px)]">
-                <StatusCard eyebrow="Ruta 1" title="Hämta i butik" content={storeBox} />
-                {onlineBox ? (
-                  <StatusCard eyebrow="Ruta 2" title="Leverans" content={onlineBox} />
-                ) : (
-                  <StatusPlaceholder />
-                )}
-              </div>
-            ) : (
-              <div className="mt-6">
-                <p className="mb-4 max-w-xl text-sm text-[var(--muted-foreground)]">
-                  Markerat kort visar den aktiva kombinatorstatusen. Övriga kort ligger kvar som
-                  referensprodukter.
-                </p>
-                <div className="grid gap-4 md:grid-cols-3">
-                  <ReferenceCard
-                    muted
-                    title="Soffa Lova 3-sits"
-                    price="7 995 kr"
-                    status={<DotStatus tone="green" label="Finns i lager" />}
-                  />
-                  <ReferenceCard
-                    featured
-                    title="Fåtölj Lova"
-                    price="3 495 kr"
-                    status={
-                      <DotStatus
-                        tone={cardStatus.tone}
-                        label={
-                          cardStatus.sublabel
-                            ? `${cardStatus.label} · ${cardStatus.sublabel}`
-                            : cardStatus.label
-                        }
-                      />
-                    }
-                  />
-                  <ReferenceCard
-                    muted
-                    title="Bord Eker runt"
-                    price="4 295 kr"
-                    status={<DotStatus tone="neutral" label="Beställningsvara · 4–8 v" />}
-                  />
-                </div>
-              </div>
-            )}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-2xl">
+              <ProductCard title="Soffa Lova 3-sits" price="7 995 kr" muted status={<CardStatusBadge tone="green" label="Finns i lager" />} />
+              <ProductCard
+                title="Fåtölj Lova"
+                price="3 495 kr"
+                featured
+                status={<CardStatusBadge tone={cardStatus.tone} label={cardStatus.sublabel ? `${cardStatus.label} · ${cardStatus.sublabel}` : cardStatus.label} />}
+              />
+              <ProductCard title="Bord Eker runt" price="4 295 kr" muted status={<CardStatusBadge tone="neutral" label="Beställningsvara · 4–8 v" />} />
+            </div>
           </div>
-        </main>
-      </div>
+        )}
+      </main>
     </div>
   );
 }
 
-function StatusCard({
-  eyebrow,
-  title,
-  content,
+function RadioPill({ checked, label, onChange }: { checked: boolean; label: string; onChange: () => void }) {
+  return (
+    <label className="flex items-center gap-3 cursor-pointer rounded-lg border border-[#e8e5e0] bg-white px-4 py-2.5 text-sm text-[#111] hover:border-[#ccc] transition-colors">
+      <input type="radio" checked={checked} onChange={onChange} className="h-4 w-4 accent-[var(--success)]" />
+      {label}
+    </label>
+  );
+}
+
+function CheckRow({ checked, label, onChange }: { checked: boolean; label: string; onChange: () => void }) {
+  return (
+    <label className="flex items-center gap-2.5 cursor-pointer text-sm text-[#333]">
+      <input type="checkbox" checked={checked} onChange={onChange} className="h-4 w-4 accent-[var(--success)]" />
+      {label}
+    </label>
+  );
+}
+
+function SelectField({
+  label,
+  value,
+  disabled,
+  options,
+  onChange,
 }: {
-  eyebrow: string;
-  title: string;
-  content: BoxContent;
+  label: string;
+  value: string;
+  disabled: boolean;
+  options: { id: string; label: string }[];
+  onChange: (v: string) => void;
 }) {
   return (
-    <section className="rounded-[1.75rem] border border-[var(--border)] bg-[var(--card)] p-5 shadow-[0_10px_30px_rgba(34,30,24,0.06)]">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted-foreground)]">
-        {eyebrow}
-      </p>
-      <h2 className="mt-1 text-xl font-semibold tracking-[-0.03em]">{title}</h2>
-      <div className="mt-5">
-        {content.rows.map((row, index) => (
-          <div key={`${row.kind}-${row.text}`}>
-            {index > 0 && <div className="my-4 border-t border-[var(--border)]" />}
-            <BoxRowView row={row} />
-          </div>
-        ))}
-        {content.footerLink ? (
-          <div className="mt-4 border-t border-[var(--border)] pt-4">
-            <button className="text-sm font-medium underline decoration-[rgba(43,58,44,0.3)] underline-offset-4">
-              {content.footerLink}
-            </button>
-          </div>
-        ) : null}
-      </div>
-    </section>
-  );
-}
-
-function BoxRowView({ row }: { row: BoxRow }) {
-  if (row.kind === "stock") {
-    return (
-      <div className="flex items-center gap-3">
-        <span
-          className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${
-            row.tone === "positive" ? "bg-[var(--success)]" : "bg-[#c7c7c2]"
-          }`}
-        />
-        <p
-          className={`flex-1 text-sm leading-6 ${
-            row.tone === "positive" ? "text-[var(--foreground)]" : "text-[var(--muted-foreground)]"
-          }`}
-        >
-          {row.text}
-        </p>
-        {row.action ? (
-          <button className="text-xs font-medium underline decoration-[rgba(43,58,44,0.3)] underline-offset-4">
-            {row.action}
-          </button>
-        ) : null}
-      </div>
-    );
-  }
-
-  if (row.kind === "eta") {
-    return (
-      <div className="flex items-center gap-3">
-        <span className="icon text-[var(--success)]">{icons.clock}</span>
-        <p className="flex-1 text-sm leading-6">{row.text}</p>
-        {row.action ? (
-          <button className="text-xs font-medium underline decoration-[rgba(43,58,44,0.3)] underline-offset-4">
-            {row.action}
-          </button>
-        ) : null}
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-3">
-      <span className="icon text-[var(--muted-foreground)]">{icons[row.icon]}</span>
-      <p className="flex-1 text-sm leading-6">{row.text}</p>
-      {"price" in row && row.price ? (
-        <span className="text-xs font-medium text-[var(--muted-foreground)]">{row.price}</span>
-      ) : null}
+    <div>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#999] mb-1.5">{label}</p>
+      <select value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)} className="field">
+        {options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+      </select>
     </div>
   );
 }
 
-function StatusPlaceholder() {
+function TabBtn({ active, children, onClick }: { active: boolean; children: React.ReactNode; onClick: () => void }) {
   return (
-    <section className="rounded-[1.75rem] border border-dashed border-[var(--border)] bg-[rgba(255,255,255,0.42)] p-5 text-sm text-[var(--muted-foreground)]">
-      Ruta 2 döljs i det här scenariot eftersom hemleveransen hanteras i Ruta 1.
-    </section>
+    <button
+      onClick={onClick}
+      className={`-mb-px px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+        active ? "border-[#111] text-[#111]" : "border-transparent text-[#aaa] hover:text-[#555]"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
-function ReferenceCard({
-  title,
-  price,
-  status,
-  featured = false,
-  muted = false,
-}: {
+function ProductCard({ title, price, status, featured = false, muted = false }: {
   title: string;
   price: string;
   status: React.ReactNode;
@@ -338,108 +170,39 @@ function ReferenceCard({
   muted?: boolean;
 }) {
   return (
-    <article
-      className={`overflow-hidden rounded-[1.5rem] bg-white shadow-[0_18px_45px_rgba(45,38,27,0.08)] ${
-        featured ? "border-2 border-[var(--foreground)]" : "border border-[var(--border)]"
-      } ${muted ? "opacity-55" : ""}`}
-    >
-      <div className="aspect-[4/3] bg-[linear-gradient(135deg,_rgba(184,193,180,0.45),_rgba(227,220,203,0.65))]" />
-      <div className="p-4">
-        <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Mio</p>
-        <h3 className="mt-1 text-sm font-medium">{title}</h3>
-        <p className="mt-2 text-sm font-semibold">{price}</p>
-        <div className="mt-3">{status}</div>
+    <article className={`overflow-hidden bg-white transition-opacity ${featured ? "border-2 border-[#111]" : "border border-[#e0ddd7]"} ${muted ? "opacity-50" : ""}`}>
+      <div className="aspect-[4/3] bg-[#f0ede8]" />
+      <div className="p-3 border-t border-[#e0ddd7]">
+        <p className="text-[10px] uppercase tracking-[0.2em] text-[#aaa] mb-0.5">Mio</p>
+        <h3 className="text-sm font-medium text-[#111] leading-snug">{title}</h3>
+        <p className="text-sm font-semibold text-[#111] mt-1.5 mb-3">{price}</p>
+        {status}
       </div>
     </article>
   );
 }
 
-function DotStatus({
-  tone,
-  label,
-}: {
-  tone: "green" | "amber" | "neutral" | "gray";
-  label: string;
-}) {
-  if (tone === "gray") {
-    return (
-      <div className="flex items-center gap-2">
-        <span className="h-2.5 w-2.5 rounded-full bg-[#c7c7c2]" />
-        <span className="text-xs text-[var(--muted-foreground)]">{label}</span>
-      </div>
-    );
-  }
-
+function CardStatusBadge({ tone, label }: { tone: "green" | "amber" | "neutral" | "gray"; label: string }) {
   if (tone === "green") {
     return (
-      <div className="flex items-center gap-2">
-        <span className="h-2.5 w-2.5 rounded-full bg-[var(--success)]" />
-        <span className="text-xs">{label}</span>
+      <div className="flex items-center gap-1.5">
+        <span className="size-2 rounded-full shrink-0 bg-[var(--success)]" />
+        <span className="text-xs text-[#111]">{label}</span>
       </div>
     );
   }
-
+  if (tone === "gray") {
+    return (
+      <div className="flex items-center gap-1.5">
+        <span className="size-2 rounded-full shrink-0 bg-[var(--dot-muted)]" />
+        <span className="text-xs text-[#888]">{label}</span>
+      </div>
+    );
+  }
   return (
-    <div className="flex items-center gap-2">
-      <span className="icon text-[var(--success)]">{icons.clock}</span>
-      <span className="text-xs">{label}</span>
+    <div className="flex items-center gap-1.5">
+      <span style={{ color: "var(--success)" }}><ClockIcon size={12} /></span>
+      <span className="text-xs text-[#111]">{label}</span>
     </div>
-  );
-}
-
-function RadioRow({
-  checked,
-  label,
-  onChange,
-}: {
-  checked: boolean;
-  label: string;
-  onChange: () => void;
-}) {
-  return (
-    <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm">
-      <input type="radio" checked={checked} onChange={onChange} className="h-4 w-4 accent-[var(--foreground)]" />
-      <span>{label}</span>
-    </label>
-  );
-}
-
-function CheckboxRow({
-  checked,
-  label,
-  onChange,
-}: {
-  checked: boolean;
-  label: string;
-  onChange: () => void;
-}) {
-  return (
-    <label className="flex cursor-pointer items-center gap-3 text-sm">
-      <input type="checkbox" checked={checked} onChange={onChange} className="h-4 w-4 accent-[var(--foreground)]" />
-      <span>{label}</span>
-    </label>
-  );
-}
-
-function TabButton({
-  active,
-  children,
-  onClick,
-}: {
-  active: boolean;
-  children: React.ReactNode;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`-mb-px border-b-2 px-4 py-3 text-sm font-medium transition ${
-        active
-          ? "border-[var(--foreground)] text-[var(--foreground)]"
-          : "border-transparent text-[var(--muted-foreground)]"
-      }`}
-    >
-      {children}
-    </button>
   );
 }

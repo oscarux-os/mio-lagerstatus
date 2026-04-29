@@ -51,7 +51,7 @@ export type CardStatus = {
   sublabel?: string;
 };
 
-export const STORE_NAME = "Mio Göteborg";
+export const STORE_NAME = "Mio Kungens Kurva";
 export const STORE_COUNT = 12;
 export const OTHER_STORES_COUNT = 5;
 
@@ -166,10 +166,7 @@ export function getStoreBox(
         rows: [
           {
             kind: "eta",
-            text:
-              type === "bestall"
-                ? `Beställ till ${STORE_NAME} — hämta i butik inom 4–8 veckor`
-                : `Beställ till ${STORE_NAME} — hämta i butik ${pickupLeadTime}`,
+            text: `Beställningsvara hos ${STORE_NAME}`,
             action: "Byt butik",
           },
           {

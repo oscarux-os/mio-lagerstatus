@@ -21,12 +21,12 @@ Ruta 2 - Online/Leveranstid
 
 | Tillstånd        | Ruta 1 — Hämta i butik                                    | Ruta 2 — Leverans (snabbrörligt)                        | Ruta 2 — Leverans (beställningsvaror)                   |
 | ---------------- | --------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------- |
-| I lager          | "X st i lager hos [Butik]" + hämta (60 min) + hemleverans (om BL) | "Online: X st i lager — levereras inom 2–5 dagar" | Visas i Ruta 1 (BL-driven) — Ruta 2 ej aktuell      |
-| På väg in        | "På väg till [Butik] — hämta i butik [datum]"             | "Levereras inom 4–8 veckor"                             | "Hemleverans inom 4–8 veckor"                           |
-| Beställningsläge | "Beställ till [vald butik] — hämta i butik inom 4–8 veckor" | "Levereras inom 4–8 veckor"                           | "Hemleverans inom 4–8 veckor"                           |
+| I lager          | "X st i lager hos [Butik]" + hämta (60 min) + hemleverans (om BL) | "Online: X st i lager" + "Levereras inom 2–5 dagar" | Visas i Ruta 1 (BL-driven) — Ruta 2 ej aktuell     |
+| På väg in        | "På väg till [Butik]" · hämta i butik [datum] (leveransrad) | "Levereras inom 2–3 veckor"                          | "Hemleverans inom 2–3 veckor"                           |
+| Beställningsläge | "Beställningsvara hos [Butik]" · hämta i butik [ledtid] (leveransrad) | "Levereras inom 4–8 veckor"                 | "Hemleverans inom 4–8 veckor"                           |
 | Ingen butik vald | "Finns i lager i X butiker" + CTA "Välj butik"            | Visas normalt utan butikskontext                        | Visas normalt utan butikskontext                        |
 | Fraktkostnad     | 0 kr                                                      | Från 49 kr                                              | 595 kr                                                  |
-| Ej tillgänglig   | "Denna produkt går inte att köpa ifrån butik"            | "Den här produkten går inte att beställas med leverans" | "Den här produkten går inte att beställas med leverans" |
+| Ej tillgänglig   | "Denna produkt går inte att köpa ifrån butik"             | "Den här produkten går inte att beställas med leverans" | "Den här produkten går inte att beställas med leverans" |
 
 ---
 
@@ -49,10 +49,10 @@ Logiken skiljer sig mellan beställningsvaror och snabbrörliga. Beställningsva
 - Båda leveransalternativen visas eftersom källan är BL — hemleverans hör hemma här, inte i Ruta 2
 
 **Finns ej i vald butik**
-- Copy: "Beställ till [vald butik] — hämta i butik inom 4–8 veckor"
+- Statusrad: "Beställningsvara hos [vald butik]"
+- Leveransrad: Hämta i butik inom 4–8 veckor · 0 kr
 - Inget saldo visas
 - Länk: "Hämta direkt i X andra butiker" → öppnar panel med lagerstatus per butik för produkten
-- Fraktkostnad: 0 kr
 
 **På väg in till vald butik**
 - Copy: "På väg till [vald butik] — hämta i butik [datum]"
@@ -79,10 +79,10 @@ Logiken skiljer sig mellan beställningsvaror och snabbrörliga. Beställningsva
 - Fraktkostnad: 0 kr
 
 **Finns ej i vald butik — beställningsläge**
-- Copy: "Beställ till [vald butik] — hämta i butik om [ledtid]"
+- Statusrad: "Beställningsvara hos [vald butik]"
+- Leveransrad: Hämta i butik inom [ledtid] · 0 kr
 - Ledtid styrs av lagerkälla: ~4 dagar om CL/WL har saldo, längre om beställningsvara (samma ledtid som Ruta 2)
 - Länk: "Hämta direkt i X andra butiker" → öppnar panel med lagerstatus per butik
-- Fraktkostnad: 0 kr
 
 **Kan ej hämtas i butik (t.ex. online exclusive)**
 - Visa meddelande, dölj ej rutan
@@ -115,6 +115,25 @@ Logiken skiljer sig mellan beställningsvaror och snabbrörliga. Beställningsva
 - Ruta 2 visar endast CL/WL/DI-ledtid — BL-driven hemleverans hör hemma i Ruta 1
 - Lagersaldo i Ruta 2 märks alltid som "Online:" — visas bara när källan faktiskt är CL/WL
 - Leveranstid via omvägen DI → butik → kund är alltid längre än motsvarande ledtid i ruta 1 — ingen konflikt uppstår
+
+---
+
+### Fraktsätt per scenario
+
+Vilken leveransmetod som visas i Ruta 1 respektive Ruta 2 styrs av produkttyp och lagerkälla.
+
+| Scenario | Ikon i Ruta 1 | Ikon i Ruta 2 | Fraktkostnad |
+| -------- | ------------- | ------------- | ------------ |
+| Snabbrörlig — hämta i butik | 🏪 Butik | — | 0 kr |
+| Snabbrörlig — CL/WL/DI tillgängligt | 🏪 Butik | 🚚 Lastbil | Ruta 1: 0 kr · Ruta 2: från 49 kr |
+| Snabbrörlig — enbart BL (ingen online) | 🏪 Butik + 🏠 Hem | — (Ruta 2 döljs) | Hämtning 0 kr · Hemleverans 595 kr |
+| Beställningsvara — butik i lager | 🏪 Butik + 🏠 Hem | — (Ruta 2 döljs) | Hämtning 0 kr · Hemleverans 595 kr |
+| Beställningsvara — beställningsläge | 🏪 Butik + 🏠 Hem | — (Ruta 2 döljs) | Hämtning 0 kr · Hemleverans 595 kr |
+| Beställningsvara — CL/WL direkt (framtid) | 🏪 Butik | 🏠 Hem | Ruta 1: 0 kr · Ruta 2: från 49 kr |
+
+**Princip:** BL-driven hemleverans (butik → kund) visas alltid i Ruta 1 tillsammans med hämtningsalternativet — aldrig i Ruta 2. Ruta 2 reserveras för CL/WL/DI-flöden där Mio äger hela leveranskedjan.
+
+---
 
 ### Öppet
 - Beställningsvara slutsåld — ska vi flagga "skräddarsydd/tillverkas vid beställning" som USP, och var/hur kommuniceras det?
