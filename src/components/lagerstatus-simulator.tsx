@@ -52,10 +52,10 @@ export function LagerstatusSimulator() {
         <div className="h-px bg-[#ebebeb]" />
 
         <div className="flex flex-col gap-4">
-          <SelectField label="Butik" value={storeState} disabled={noStoreSelected} options={storeOptions[type]} onChange={(v) => setStoreState(v as StoreState)} />
           <div className={type === "bestall" && !noStoreSelected && !directToCustomer ? "opacity-40" : ""}>
             <SelectField label="Online" value={onlineState} disabled={type === "bestall" && !noStoreSelected && !directToCustomer} options={onlineSelectOptions} onChange={(v) => setOnlineState(v as OnlineState)} />
           </div>
+          <SelectField label="Butik" value={storeState} disabled={noStoreSelected} options={storeOptions[type]} onChange={(v) => setStoreState(v as StoreState)} />
         </div>
 
         <div className="h-px bg-[#ebebeb]" />
