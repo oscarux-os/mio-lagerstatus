@@ -164,8 +164,8 @@ export function LagerstatusBoxes({
 }) {
   return (
     <div className="flex flex-col gap-px w-full bg-[var(--border-subtle)]">
-      <StatusCard content={storeContent} position={onlineContent ? "first" : "only"} />
-      {onlineContent && <StatusCard content={onlineContent} position="last" />}
+      {onlineContent && <StatusCard content={onlineContent} position="first" />}
+      <StatusCard content={storeContent} position={onlineContent ? "last" : "only"} />
     </div>
   );
 }
