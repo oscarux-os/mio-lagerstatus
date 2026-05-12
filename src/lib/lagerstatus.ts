@@ -335,7 +335,7 @@ export function getScenarioLabel(
   noStoreSelected: boolean,
   directToCustomer: boolean,
 ): string {
-  const typeLabel = type === "snabb" ? "Snabbrörlig" : "Beställningsvara";
+  const typeLabel = type === "snabb" ? "Snabbrörlig" : "Möbler (större)";
   const storeLabel = noStoreSelected
     ? "Ingen butik vald"
     : getOptionLabel(storeState, storeOptions[type]);

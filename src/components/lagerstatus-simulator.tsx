@@ -46,7 +46,7 @@ export function LagerstatusSimulator() {
             Produkttyp
           </legend>
           <RadioPill checked={type === "snabb"} label="Snabbrörlig" onChange={() => onTypeChange("snabb")} />
-          <RadioPill checked={type === "bestall"} label="Beställningsvara" onChange={() => onTypeChange("bestall")} />
+          <RadioPill checked={type === "bestall"} label="Möbler (större)" onChange={() => onTypeChange("bestall")} />
         </fieldset>
 
         <div className="h-px bg-[#ebebeb]" />
