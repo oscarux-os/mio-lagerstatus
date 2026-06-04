@@ -19,7 +19,7 @@ export function StoreIcon() {
   );
 }
 
-function TruckIcon() {
+export function TruckIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
       <rect x="1" y="3" width="15" height="13" rx="1" />
@@ -30,19 +30,20 @@ function TruckIcon() {
   );
 }
 
-export function HomeIcon() {
+export function PackageIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-      <path d="m3 12 9-9 9 9" />
-      <path d="M9 21v-9h6v9" />
-      <path d="M3 12v9h18v-9" />
+      <path d="m7.5 4.27 9 5.15" />
+      <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+      <path d="M3.3 7 12 12l8.7-5" />
+      <path d="M12 22V12" />
     </svg>
   );
 }
 
-function iconForSlot(slot: "store" | "truck" | "home") {
+function iconForSlot(slot: "store" | "truck" | "package") {
   if (slot === "store") return <StoreIcon />;
-  if (slot === "home") return <HomeIcon />;
+  if (slot === "package") return <PackageIcon />;
   return <TruckIcon />;
 }
 

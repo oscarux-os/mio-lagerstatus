@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { getStoreList, type StoreInfo, type StoreListItem } from "@/lib/lagerstatus";
-import { ClockIcon, HomeIcon, StoreIcon } from "./status-card";
+import { ClockIcon, StoreIcon, TruckIcon } from "./status-card";
 
 function StatusDot({ tone }: { tone: StoreListItem["status"]["tone"] }) {
   if (tone === "neutral") {
@@ -55,7 +55,7 @@ function StoreRow({
             <span>{pickup}</span>
           </div>
           <div className="flex items-center gap-1.5 text-sm" style={{ color: "var(--muted-foreground)" }}>
-            <HomeIcon />
+            <TruckIcon />
             <span>{homeDelivery}</span>
           </div>
         </div>

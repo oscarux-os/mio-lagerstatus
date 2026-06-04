@@ -1,4 +1,4 @@
-export type ProductType = "snabb" | "bestall";
+export type ProductType = "snabb" | "bestall" | "lagervara";
 export type StoreState =
   | "i_lager"
   | "pa_vag_in"
@@ -30,13 +30,13 @@ export type BoxRow =
     }
   | {
       kind: "delivery";
-      icon: "store" | "truck" | "home";
+      icon: "store" | "truck" | "package";
       text: string;
       price?: string;
     }
   | {
       kind: "message";
-      icon: "store" | "truck" | "home";
+      icon: "store" | "truck" | "package";
       text: string;
     };
 
@@ -122,6 +122,12 @@ export const storeOptions: Record<ProductType, Option<StoreState>[]> = {
     { id: "bestallningslage", label: "Beställningsläge" },
     { id: "ej_tillganglig", label: "Ej tillgänglig" },
   ],
+  lagervara: [
+    { id: "i_lager", label: "I lager" },
+    { id: "pa_vag_in", label: "På väg in" },
+    { id: "bestallningslage", label: "Beställningsläge" },
+    { id: "ej_tillganglig", label: "Ej tillgänglig" },
+  ],
 };
 
 export const onlineOptions: Record<ProductType, Option<OnlineState>[]> = {
@@ -133,6 +139,13 @@ export const onlineOptions: Record<ProductType, Option<OnlineState>[]> = {
     { id: "ej_tillganglig", label: "Ej tillgänglig" },
   ],
   bestall: [
+    { id: "i_lager_cl", label: "I lager" },
+    { id: "pa_vag_in", label: "På väg in online" },
+    { id: "bestallningslage", label: "Beställningsläge online" },
+    { id: "ej_tillganglig", label: "Ej tillgänglig" },
+  ],
+  // Online-rutan döljs alltid för lagervara; posten krävs bara av Record-typen.
+  lagervara: [
     { id: "i_lager_cl", label: "I lager" },
     { id: "pa_vag_in", label: "På väg in online" },
     { id: "bestallningslage", label: "Beställningsläge online" },
@@ -155,7 +168,7 @@ export function getStoreListItem(store: StoreInfo): StoreListItem {
       return {
         store,
         status: { tone: "green", label: `${store.stockCount} st i lager` },
-        pickup: "Hämta i butik inom 60 minuter",
+        pickup: "Hämta gratis i butik inom 60 minuter",
         homeDelivery: "Hemleverans inom 3–9 dagar",
         available: true,
       };
@@ -163,7 +176,7 @@ export function getStoreListItem(store: StoreInfo): StoreListItem {
       return {
         store,
         status: { tone: "amber", label: "På väg in" },
-        pickup: "Hämta i butik från 15 maj",
+        pickup: "Hämta gratis i butik från 15 maj",
         homeDelivery: "Hemleverans inom 2–3 veckor",
         available: true,
       };
@@ -171,7 +184,7 @@ export function getStoreListItem(store: StoreInfo): StoreListItem {
       return {
         store,
         status: { tone: "neutral", label: "Beställningsvara", sublabel: "4–8 v" },
-        pickup: "Hämta i butik inom 4–8 veckor",
+        pickup: "Hämta gratis i butik inom 4–8 veckor",
         homeDelivery: "Hemleverans inom 4–8 veckor",
         available: true,
       };
@@ -194,8 +207,54 @@ export function getStoreBox(
   state: StoreState,
   noStoreSelected: boolean,
   type: ProductType,
+  onlineState: OnlineState,
 ): BoxContent {
-  const pickupLeadTime = type === "snabb" ? "inom 2–5 dagar" : "inom 4–8 veckor";
+  // Lagervara = centrallager-saldo, ej kopplat till en specifik butik.
+  // Visar antal i lager samt både butikshämtning och hemleverans.
+  if (type === "lagervara") {
+    switch (state) {
+      case "i_lager":
+        return {
+          rows: [
+            { kind: "stock", text: "Online: 24 st i lager", tone: "positive" },
+            { kind: "delivery", icon: "store", text: "Hämta gratis i butik inom 4 dagar" },
+            { kind: "delivery", icon: "truck", text: "Hemleverans inom 3–9 dagar" },
+          ],
+        };
+      case "pa_vag_in":
+        return {
+          rows: [
+            { kind: "eta", text: "På väg in" },
+            { kind: "delivery", icon: "store", text: "Hämta gratis i butik från 15 maj" },
+            { kind: "delivery", icon: "truck", text: "Hemleverans inom 2–3 veckor" },
+          ],
+        };
+      case "bestallningslage":
+        return {
+          rows: [
+            { kind: "eta", text: "Beställningsvara" },
+            { kind: "delivery", icon: "store", text: "Hämta gratis i butik inom 4–8 veckor" },
+            { kind: "delivery", icon: "truck", text: "Hemleverans inom 4–8 veckor" },
+          ],
+        };
+      case "ej_tillganglig":
+        return {
+          rows: [
+            { kind: "message", icon: "store", text: "Den här produkten är tillfälligt slut" },
+          ],
+        };
+    }
+  }
+
+  const inStockPickup = "Hämta gratis i butik inom 60 minuter";
+
+  // Snabbrörlig kan hemlevereras även när online/ombud inte är tillgängligt
+  // (slut eller enbart butikslager). Då bär butiksrutan hemleveransalternativet.
+  const onlineUnavailable = onlineState === "ej_tillganglig" || onlineState === "enbart_bl";
+  const snabbHomeDelivery: BoxRow[] =
+    type === "snabb" && onlineUnavailable
+      ? [{ kind: "delivery", icon: "truck", text: "Hemleverans inom 3–9 dagar" }]
+      : [];
 
   if (noStoreSelected) {
     return {
@@ -223,19 +282,18 @@ export function getStoreBox(
           {
             kind: "delivery",
             icon: "store",
-            text: "Hämta i butik inom 60 minuter",
-            price: "0 kr",
+            text: inStockPickup,
           },
           ...(type === "bestall"
             ? [
                 {
                   kind: "delivery" as const,
-                  icon: "home" as const,
+                  icon: "truck" as const,
                   text: "Hemleverans inom 3–9 dagar",
-                  price: "595 kr",
                 },
               ]
             : []),
+          ...snabbHomeDelivery,
         ],
       };
     case "pa_vag_in":
@@ -249,16 +307,14 @@ export function getStoreBox(
           {
             kind: "delivery",
             icon: "store",
-            text: "Hämta i butik från 15 maj",
-            price: "0 kr",
+            text: "Hämta gratis i butik från 15 maj",
           },
           ...(type === "bestall"
             ? [
                 {
                   kind: "delivery" as const,
-                  icon: "home" as const,
+                  icon: "truck" as const,
                   text: "Hemleverans inom 2–3 veckor",
-                  price: "595 kr",
                 },
               ]
             : []),
@@ -276,16 +332,14 @@ export function getStoreBox(
           {
             kind: "delivery",
             icon: "store",
-            text: "Hämta i butik inom 4–8 veckor",
-            price: "0 kr",
+            text: "Hämta gratis i butik inom 4–8 veckor",
           },
           ...(type === "bestall"
             ? [
                 {
                   kind: "delivery" as const,
-                  icon: "home" as const,
+                  icon: "truck" as const,
                   text: "Hemleverans inom 4–8 veckor",
-                  price: "595 kr",
                 },
               ]
             : []),
@@ -300,6 +354,8 @@ export function getStoreBox(
             icon: "store",
             text: "Denna produkt går inte att köpa ifrån butik",
           },
+          // Snabbrörlig kan fortfarande hemlevereras även om butiken är slut.
+          ...snabbHomeDelivery,
         ],
       };
   }
@@ -310,9 +366,14 @@ export function getOnlineBox(
   type: ProductType,
   directToCustomer: boolean,
 ): BoxContent | null {
-  if (type === "bestall" && !directToCustomer) {
+  if ((type === "bestall" && !directToCustomer) || type === "lagervara") {
     return null;
   }
+
+  // CL/WL/DI direkt till kund visas som hemleverans (lastbil, utan pris); annars leverans till ombud (paket).
+  // Priset bakas in i ombud-texten (jfr "Hämta gratis i butik …") istället för en separat prislapp.
+  const isHomeDelivery = directToCustomer && type === "bestall";
+  const deliveryIcon = isHomeDelivery ? "truck" : "package";
 
   switch (state) {
     case "i_lager_cl":
@@ -325,12 +386,8 @@ export function getOnlineBox(
           },
           {
             kind: "delivery",
-            icon: directToCustomer && type === "bestall" ? "home" : "truck",
-            text:
-              directToCustomer && type === "bestall"
-                ? "Hemleverans inom 3–9 dagar"
-                : "Levereras inom 2–5 dagar",
-            price: "Från 49 kr",
+            icon: deliveryIcon,
+            text: isHomeDelivery ? "Hemleverans inom 3–9 dagar" : "Levereras inom 2–5 dagar, från 49 kr",
           },
         ],
       };
@@ -343,12 +400,8 @@ export function getOnlineBox(
           },
           {
             kind: "delivery",
-            icon: directToCustomer && type === "bestall" ? "home" : "truck",
-            text:
-              directToCustomer && type === "bestall"
-                ? "Hemleverans inom 2–3 veckor"
-                : "Levereras inom 2–3 veckor",
-            price: "Från 49 kr",
+            icon: deliveryIcon,
+            text: isHomeDelivery ? "Hemleverans inom 2–3 veckor" : "Levereras inom 2–3 veckor, från 49 kr",
           },
         ],
       };
@@ -357,19 +410,12 @@ export function getOnlineBox(
         rows: [
           {
             kind: "eta",
-            text:
-              directToCustomer && type === "bestall"
-                ? "Beställ online"
-                : "Beställningsvara online",
+            text: isHomeDelivery ? "Beställ online" : "Beställningsvara online",
           },
           {
             kind: "delivery",
-            icon: directToCustomer && type === "bestall" ? "home" : "truck",
-            text:
-              directToCustomer && type === "bestall"
-                ? "Hemleverans inom 4–8 veckor"
-                : "Levereras inom 4–8 veckor",
-            price: "Från 49 kr",
+            icon: deliveryIcon,
+            text: isHomeDelivery ? "Hemleverans inom 4–8 veckor" : "Levereras inom 4–8 veckor, från 49 kr",
           },
         ],
       };
@@ -380,8 +426,8 @@ export function getOnlineBox(
         rows: [
           {
             kind: "message",
-            icon: directToCustomer && type === "bestall" ? "home" : "truck",
-            text: "Den här produkten går inte att beställas med leverans",
+            icon: deliveryIcon,
+            text: "Går inte att beställa till ombud",
           },
         ],
       };
@@ -439,12 +485,15 @@ export function getScenarioLabel(
   noStoreSelected: boolean,
   directToCustomer: boolean,
 ): string {
-  const typeLabel = type === "snabb" ? "Snabbrörlig" : "Möbler (större)";
+  const typeLabel =
+    type === "snabb" ? "Snabbrörlig" : type === "lagervara" ? "Lagervara" : "Möbler (större)";
   const storeLabel = noStoreSelected
     ? "Ingen butik vald"
     : getOptionLabel(storeState, storeOptions[type]);
   const onlineLabel =
-    type === "bestall" && !noStoreSelected && !directToCustomer
+    type === "lagervara"
+      ? "Döljs (via butik)"
+      : type === "bestall" && !noStoreSelected && !directToCustomer
       ? "Döljs (BL-driven)"
       : getOptionLabel(
           onlineState,

@@ -30,7 +30,11 @@ export function LagerstatusSimulator() {
   const onlineSelectOptions =
     type === "bestall" && directToCustomer ? onlineOptions.snabb : onlineOptions[type];
 
-  const storeBox = getStoreBox(storeState, noStoreSelected, type);
+  // Online-rutan finns inte för lagervara (endast butik) eller för möbler utan CL/WL/DI direkt.
+  const onlineHidden =
+    type === "lagervara" || (type === "bestall" && !noStoreSelected && !directToCustomer);
+
+  const storeBox = getStoreBox(storeState, noStoreSelected, type, onlineState);
   const onlineBox = getOnlineBox(onlineState, type, directToCustomer);
   const cardStatus = getCardStatus(storeState, onlineState, noStoreSelected, type, directToCustomer);
 
@@ -51,13 +55,14 @@ export function LagerstatusSimulator() {
           </legend>
           <RadioPill checked={type === "snabb"} label="Snabbrörlig" onChange={() => onTypeChange("snabb")} />
           <RadioPill checked={type === "bestall"} label="Möbler (större)" onChange={() => onTypeChange("bestall")} />
+          <RadioPill checked={type === "lagervara"} label="Lagervara (via butik)" onChange={() => onTypeChange("lagervara")} />
         </fieldset>
 
         <div className="h-px bg-[#ebebeb]" />
 
         <div className="flex flex-col gap-4">
-          <div className={type === "bestall" && !noStoreSelected && !directToCustomer ? "opacity-40" : ""}>
-            <SelectField label="Online" value={onlineState} disabled={type === "bestall" && !noStoreSelected && !directToCustomer} options={onlineSelectOptions} onChange={(v) => setOnlineState(v as OnlineState)} />
+          <div className={onlineHidden ? "opacity-40" : ""}>
+            <SelectField label="Online" value={onlineState} disabled={onlineHidden} options={onlineSelectOptions} onChange={(v) => setOnlineState(v as OnlineState)} />
           </div>
           <SelectField label="Butik" value={storeState} disabled={noStoreSelected} options={storeOptions[type]} onChange={(v) => setStoreState(v as StoreState)} />
         </div>
