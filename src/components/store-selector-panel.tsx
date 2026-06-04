@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { getStoreList, type StoreInfo, type StoreListItem } from "@/lib/lagerstatus";
-import { ClockIcon, StoreIcon, TruckIcon } from "./status-card";
+import { ClockIcon, StoreIcon } from "./status-card";
 
 function StatusDot({ tone }: { tone: StoreListItem["status"]["tone"] }) {
   if (tone === "neutral") {
@@ -30,7 +30,7 @@ function StoreRow({
   selected: boolean;
   onSelect: () => void;
 }) {
-  const { store, status, pickup, homeDelivery } = item;
+  const { store, status, pickupDate } = item;
   return (
     <div
       className={`w-full p-4 flex items-start justify-between gap-3 transition-colors ${
@@ -49,16 +49,12 @@ function StoreRow({
           </span>
         </div>
 
-        <div className="flex flex-col gap-1">
+        {pickupDate && (
           <div className="flex items-center gap-1.5 text-sm" style={{ color: "var(--muted-foreground)" }}>
             <StoreIcon />
-            <span>{pickup}</span>
+            <span>{pickupDate}</span>
           </div>
-          <div className="flex items-center gap-1.5 text-sm" style={{ color: "var(--muted-foreground)" }}>
-            <TruckIcon />
-            <span>{homeDelivery}</span>
-          </div>
-        </div>
+        )}
       </div>
 
       <button
