@@ -9,9 +9,11 @@ import {
   storeOptions,
   type OnlineState,
   type ProductType,
+  type StoreInfo,
   type StoreState,
 } from "@/lib/lagerstatus";
 import { ClockIcon, LagerstatusBoxes } from "./status-card";
+import { StoreSelectorPanel } from "./store-selector-panel";
 
 type Tab = "produktsida" | "produktkort";
 
@@ -22,6 +24,8 @@ export function LagerstatusSimulator() {
   const [directToCustomer, setDirectToCustomer] = useState(false);
   const [storeState, setStoreState] = useState<StoreState>("i_lager");
   const [onlineState, setOnlineState] = useState<OnlineState>("i_lager_cl");
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [selectedStore, setSelectedStore] = useState<StoreInfo | undefined>(undefined);
 
   const onlineSelectOptions =
     type === "bestall" && directToCustomer ? onlineOptions.snabb : onlineOptions[type];
@@ -78,7 +82,7 @@ export function LagerstatusSimulator() {
 
         {tab === "produktsida" ? (
           <div className="max-w-sm">
-            <LagerstatusBoxes storeContent={storeBox} onlineContent={onlineBox} />
+            <LagerstatusBoxes storeContent={storeBox} onlineContent={onlineBox} onStoreAction={() => setPanelOpen(true)} />
           </div>
         ) : (
           <div>
@@ -98,6 +102,17 @@ export function LagerstatusSimulator() {
           </div>
         )}
       </main>
+
+      <StoreSelectorPanel
+        open={panelOpen}
+        selectedStoreId={selectedStore?.id}
+        onClose={() => setPanelOpen(false)}
+        onSelect={(store) => {
+          setSelectedStore(store);
+          setStoreState(store.state);
+          setNoStoreSelected(false);
+        }}
+      />
     </div>
   );
 }
