@@ -156,45 +156,35 @@ export const onlineOptions: Record<ProductType, Option<OnlineState>[]> = {
 export type StoreListItem = {
   store: StoreInfo;
   status: CardStatus;
-  pickup: string;
-  homeDelivery: string;
-  available: boolean;
+  // Visas bara för "på väg in" – datum då varan kan hämtas i butiken.
+  pickupDate?: string;
 };
 
-// Härleder status + ledtider per butik för panelen, med samma copy som rutorna.
+// Panelen visar butiksnamn + lagerstatus per butik. Hämtning/hemleverans bor i
+// rutorna (hemleverans är dessutom inte butiksberoende); endast "på väg in" får
+// ett hämtdatum eftersom det är den status där datumet tillför något.
 export function getStoreListItem(store: StoreInfo): StoreListItem {
   switch (store.state) {
     case "i_lager":
       return {
         store,
         status: { tone: "green", label: `${store.stockCount} st i lager` },
-        pickup: "Hämta gratis i butik inom 60 minuter",
-        homeDelivery: "Hemleverans inom 3–9 dagar",
-        available: true,
       };
     case "pa_vag_in":
       return {
         store,
         status: { tone: "amber", label: "På väg in" },
-        pickup: "Hämta gratis i butik från 15 maj",
-        homeDelivery: "Hemleverans inom 2–3 veckor",
-        available: true,
+        pickupDate: "Hämta i butik från 15 maj",
       };
     case "bestallningslage":
       return {
         store,
         status: { tone: "neutral", label: "Beställningsvara", sublabel: "4–8 v" },
-        pickup: "Hämta gratis i butik inom 4–8 veckor",
-        homeDelivery: "Hemleverans inom 4–8 veckor",
-        available: true,
       };
     case "ej_tillganglig":
       return {
         store,
         status: { tone: "gray", label: "Ej tillgänglig" },
-        pickup: "Går inte att hämta i denna butik",
-        homeDelivery: "Ingen hemleverans",
-        available: false,
       };
   }
 }
