@@ -55,6 +55,60 @@ export const STORE_NAME = "Mio Kungens Kurva";
 export const STORE_COUNT = 12;
 export const OTHER_STORES_COUNT = 5;
 
+// --- Butiksval-panel: data per butik ---------------------------------------
+
+export type StoreInfo = {
+  id: string;
+  name: string;
+  area: string;
+  distanceKm: number;
+  state: StoreState;
+  stockCount: number;
+};
+
+// Alla Mio-butiker i Sverige (från mio.se/butiker). Mock-status per butik.
+const STORE_CITIES = [
+  "Alingsås", "Avesta", "Arvika", "Bäckebol", "Bromma", "Barkarby", "Borås",
+  "Borlänge", "Bollnäs", "Enköping", "Eskilstuna", "Falun", "Falkenberg",
+  "Helsingborg", "Halmstad", "Hudiksvall", "Handen", "Härnösand", "Jönköping",
+  "Kristinehamn", "Kungsbacka", "Katrineholm", "Kristianstad", "Karlstad",
+  "Karlskrona", "Kalmar", "Kungens Kurva", "Långsele", "Luleå", "Lund",
+  "Linköping", "Ludvika", "Lidköping", "Mölndal", "Mora", "Mariehamn",
+  "Malmö Svågertorp", "Mariestad", "Mjölby", "Nyköping", "Norrtälje", "Nacka",
+  "Nässjö", "Norrköping", "Piteå", "Södertälje", "Stockholm City", "Skellefteå",
+  "Skövde", "Sundsvall", "Trollhättan", "Täby", "Trelleborg", "Tanum", "Umeå",
+  "Uppsala", "Uddevalla", "Upplands Väsby", "Vilhelmina", "Värnamo", "Varberg",
+  "Växjö", "Västra Frölunda", "Västervik", "Värmdö", "Visby", "Valbo",
+  "Västerås", "Ystad", "Åmål", "Ängelholm", "Örnsköldsvik", "Östersund", "Örebro",
+];
+
+const STORE_STATES: StoreState[] = ["i_lager", "pa_vag_in", "bestallningslage", "ej_tillganglig"];
+
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/å|ä/g, "a")
+    .replace(/ö/g, "o")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
+// Deterministisk fördelning: mestadels i lager, en del på väg in / beställning,
+// enstaka ej tillgänglig. Härleds ur index så prototypen är stabil mellan renders.
+export const STORES: StoreInfo[] = STORE_CITIES.map((city, i) => {
+  const bucket = i % 7;
+  const state =
+    bucket < 4 ? STORE_STATES[0] : bucket < 5 ? STORE_STATES[1] : bucket < 6 ? STORE_STATES[2] : STORE_STATES[3];
+  return {
+    id: slugify(city),
+    name: `Mio ${city}`,
+    area: city,
+    distanceKm: 3 + ((i * 37) % 240),
+    state,
+    stockCount: state === "i_lager" ? 1 + ((i * 13) % 11) : 0,
+  };
+});
+
 export const storeOptions: Record<ProductType, Option<StoreState>[]> = {
   snabb: [
     { id: "i_lager", label: "I lager" },
@@ -85,6 +139,56 @@ export const onlineOptions: Record<ProductType, Option<OnlineState>[]> = {
     { id: "ej_tillganglig", label: "Ej tillgänglig" },
   ],
 };
+
+export type StoreListItem = {
+  store: StoreInfo;
+  status: CardStatus;
+  pickup: string;
+  homeDelivery: string;
+  available: boolean;
+};
+
+// Härleder status + ledtider per butik för panelen, med samma copy som rutorna.
+export function getStoreListItem(store: StoreInfo): StoreListItem {
+  switch (store.state) {
+    case "i_lager":
+      return {
+        store,
+        status: { tone: "green", label: `${store.stockCount} st i lager` },
+        pickup: "Hämta i butik inom 60 minuter",
+        homeDelivery: "Hemleverans inom 3–9 dagar",
+        available: true,
+      };
+    case "pa_vag_in":
+      return {
+        store,
+        status: { tone: "amber", label: "På väg in" },
+        pickup: "Hämta i butik från 15 maj",
+        homeDelivery: "Hemleverans inom 2–3 veckor",
+        available: true,
+      };
+    case "bestallningslage":
+      return {
+        store,
+        status: { tone: "neutral", label: "Beställningsvara", sublabel: "4–8 v" },
+        pickup: "Hämta i butik inom 4–8 veckor",
+        homeDelivery: "Hemleverans inom 4–8 veckor",
+        available: true,
+      };
+    case "ej_tillganglig":
+      return {
+        store,
+        status: { tone: "gray", label: "Ej tillgänglig" },
+        pickup: "Går inte att hämta i denna butik",
+        homeDelivery: "Ingen hemleverans",
+        available: false,
+      };
+  }
+}
+
+export function getStoreList(): StoreListItem[] {
+  return STORES.map((store) => getStoreListItem(store));
+}
 
 export function getStoreBox(
   state: StoreState,

@@ -9,7 +9,7 @@ export function ClockIcon({ size = 16 }: { size?: number }) {
   );
 }
 
-function StoreIcon() {
+export function StoreIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
       <path d="M3 9l1-5h16l1 5" />
@@ -30,7 +30,7 @@ function TruckIcon() {
   );
 }
 
-function HomeIcon() {
+export function HomeIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
       <path d="m3 12 9-9 9 9" />
@@ -46,7 +46,7 @@ function iconForSlot(slot: "store" | "truck" | "home") {
   return <TruckIcon />;
 }
 
-function StockRow({ row }: { row: Extract<BoxRow, { kind: "stock" }> }) {
+function StockRow({ row, onAction }: { row: Extract<BoxRow, { kind: "stock" }>; onAction?: () => void }) {
   return (
     <div className="flex items-center gap-1.5 w-full">
       <div className="flex items-center shrink-0 w-4 h-5">
@@ -62,7 +62,7 @@ function StockRow({ row }: { row: Extract<BoxRow, { kind: "stock" }> }) {
         {row.text}
       </p>
       {row.action && (
-        <button className="shrink-0 text-base leading-6 tracking-[-0.2px] underline underline-offset-2 whitespace-nowrap" style={{ color: "var(--text)" }}>
+        <button onClick={onAction} className="shrink-0 text-base leading-6 tracking-[-0.2px] underline underline-offset-2 whitespace-nowrap" style={{ color: "var(--text)" }}>
           {row.action}
         </button>
       )}
@@ -70,7 +70,7 @@ function StockRow({ row }: { row: Extract<BoxRow, { kind: "stock" }> }) {
   );
 }
 
-function EtaRow({ row }: { row: Extract<BoxRow, { kind: "eta" }> }) {
+function EtaRow({ row, onAction }: { row: Extract<BoxRow, { kind: "eta" }>; onAction?: () => void }) {
   return (
     <div className="flex items-center gap-1.5 w-full">
       <span className="shrink-0" style={{ color: "var(--success)" }}>
@@ -80,7 +80,7 @@ function EtaRow({ row }: { row: Extract<BoxRow, { kind: "eta" }> }) {
         {row.text}
       </p>
       {row.action && (
-        <button className="shrink-0 text-base leading-6 tracking-[-0.2px] underline underline-offset-2 whitespace-nowrap" style={{ color: "var(--text)" }}>
+        <button onClick={onAction} className="shrink-0 text-base leading-6 tracking-[-0.2px] underline underline-offset-2 whitespace-nowrap" style={{ color: "var(--text)" }}>
           {row.action}
         </button>
       )}
@@ -115,9 +115,9 @@ function MessageRow({ row }: { row: Extract<BoxRow, { kind: "message" }> }) {
   );
 }
 
-function BoxRowView({ row }: { row: BoxRow }) {
-  if (row.kind === "stock")    return <StockRow row={row} />;
-  if (row.kind === "eta")      return <EtaRow row={row} />;
+function BoxRowView({ row, onAction }: { row: BoxRow; onAction?: () => void }) {
+  if (row.kind === "stock")    return <StockRow row={row} onAction={onAction} />;
+  if (row.kind === "eta")      return <EtaRow row={row} onAction={onAction} />;
   if (row.kind === "delivery") return <DeliveryRow row={row} />;
   return <MessageRow row={row} />;
 }
@@ -130,7 +130,7 @@ function borderClass(position: CardPosition) {
   return "border border-[var(--border-subtle)]";
 }
 
-export function StatusCard({ content, position = "only" }: { content: BoxContent; position?: CardPosition }) {
+export function StatusCard({ content, position = "only", onAction }: { content: BoxContent; position?: CardPosition; onAction?: () => void }) {
   const stockRows: BoxRow[] = [];
   const deliveryRows: BoxRow[] = [];
   for (const row of content.rows) {
@@ -140,14 +140,14 @@ export function StatusCard({ content, position = "only" }: { content: BoxContent
 
   return (
     <section className={`bg-white w-full p-4 flex flex-col gap-3 ${borderClass(position)}`}>
-      {stockRows.map((row, i) => <BoxRowView key={i} row={row} />)}
+      {stockRows.map((row, i) => <BoxRowView key={i} row={row} onAction={onAction} />)}
       {deliveryRows.length > 0 && (
         <div className="flex flex-col gap-1">
           {deliveryRows.map((row, i) => <BoxRowView key={i} row={row} />)}
         </div>
       )}
       {content.footerLink && (
-        <button className="text-sm leading-5 tracking-[-0.05px] underline underline-offset-2 text-left" style={{ color: "var(--text)" }}>
+        <button onClick={onAction} className="text-sm leading-5 tracking-[-0.05px] underline underline-offset-2 text-left" style={{ color: "var(--text)" }}>
           {content.footerLink}
         </button>
       )}
@@ -158,14 +158,16 @@ export function StatusCard({ content, position = "only" }: { content: BoxContent
 export function LagerstatusBoxes({
   storeContent,
   onlineContent,
+  onStoreAction,
 }: {
   storeContent: BoxContent;
   onlineContent: BoxContent | null;
+  onStoreAction?: () => void;
 }) {
   return (
     <div className="flex flex-col gap-px w-full bg-[var(--border-subtle)]">
       {onlineContent && <StatusCard content={onlineContent} position="first" />}
-      <StatusCard content={storeContent} position={onlineContent ? "last" : "only"} />
+      <StatusCard content={storeContent} position={onlineContent ? "last" : "only"} onAction={onStoreAction} />
     </div>
   );
 }
