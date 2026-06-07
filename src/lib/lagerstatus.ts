@@ -61,6 +61,7 @@ export type StoreInfo = {
   id: string;
   name: string;
   area: string;
+  address: string;
   distanceKm: number;
   state: StoreState;
   stockCount: number;
@@ -84,6 +85,12 @@ const STORE_CITIES = [
 
 const STORE_STATES: StoreState[] = ["i_lager", "pa_vag_in", "bestallningslage", "ej_tillganglig"];
 
+// Mock-gatunamn typiska för Mios externhandelslägen. Härleds ur index för stabil prototyp.
+const STORE_STREETS = [
+  "Handelsvägen", "Industrigatan", "Köpmangatan", "Storgatan", "Verkstadsgatan",
+  "Fabriksvägen", "Hantverksvägen", "Stationsvägen", "Centrumvägen", "Logistikvägen",
+];
+
 function slugify(name: string): string {
   return name
     .toLowerCase()
@@ -103,6 +110,7 @@ export const STORES: StoreInfo[] = STORE_CITIES.map((city, i) => {
     id: slugify(city),
     name: `Mio ${city}`,
     area: city,
+    address: `${STORE_STREETS[(i * 3) % STORE_STREETS.length]} ${1 + ((i * 7) % 89)}, ${city}`,
     distanceKm: 3 + ((i * 37) % 240),
     state,
     stockCount: state === "i_lager" ? 1 + ((i * 13) % 11) : 0,
@@ -179,7 +187,7 @@ export function getStoreListItem(store: StoreInfo): StoreListItem {
     case "bestallningslage":
       return {
         store,
-        status: { tone: "neutral", label: "Beställningsvara", sublabel: "4–8 v" },
+        status: { tone: "neutral", label: "Beställningsvara, 4–8 veckor" },
       };
     case "ej_tillganglig":
       return {
@@ -337,6 +345,8 @@ export function getStoreBox(
         footerLink: `Hämta direkt i ${OTHER_STORES_COUNT} andra butiker`,
       };
     case "ej_tillganglig":
+      // Ingen hemlevererans här: snabbrörlig hemleverans fullföljs från butikssaldot,
+      // och är butiken ej tillgänglig finns inget att skicka.
       return {
         rows: [
           {
@@ -344,8 +354,6 @@ export function getStoreBox(
             icon: "store",
             text: "Denna produkt går inte att köpa ifrån butik",
           },
-          // Snabbrörlig kan fortfarande hemlevereras även om butiken är slut.
-          ...snabbHomeDelivery,
         ],
       };
   }
@@ -356,7 +364,8 @@ export function getOnlineBox(
   type: ProductType,
   directToCustomer: boolean,
 ): BoxContent | null {
-  if ((type === "bestall" && !directToCustomer) || type === "lagervara") {
+  // Lagervara har ingen separat online-ruta – dess enda ruta ÄR centrallagersaldot.
+  if (type === "lagervara") {
     return null;
   }
 
@@ -364,6 +373,24 @@ export function getOnlineBox(
   // Priset bakas in i ombud-texten (jfr "Hämta gratis i butik …") istället för en separat prislapp.
   const isHomeDelivery = directToCustomer && type === "bestall";
   const deliveryIcon = isHomeDelivery ? "truck" : "package";
+
+  // Online-rutan visas alltid (även för produkter utan onlinesaldo) så att den inte
+  // försvinner när man bläddrar mellan produkter. Saknas ombudskanalen upplyser vi om
+  // det här; hämtning/hemleverans (butikssaldot) bor kvar i butiksrutan.
+  const ombudUnavailable: BoxContent = {
+    rows: [
+      {
+        kind: "message",
+        icon: deliveryIcon,
+        text: "Levereras inte till ombud",
+      },
+    ],
+  };
+
+  // Möbler utan CL/WL/DI direkt säljs via butikslager och kan aldrig beställas till ombud.
+  if (type === "bestall" && !directToCustomer) {
+    return ombudUnavailable;
+  }
 
   switch (state) {
     case "i_lager_cl":
@@ -410,17 +437,9 @@ export function getOnlineBox(
         ],
       };
     case "enbart_bl":
-      return null;
+      return ombudUnavailable;
     case "ej_tillganglig":
-      return {
-        rows: [
-          {
-            kind: "message",
-            icon: deliveryIcon,
-            text: "Går inte att beställa till ombud",
-          },
-        ],
-      };
+      return ombudUnavailable;
   }
 }
 

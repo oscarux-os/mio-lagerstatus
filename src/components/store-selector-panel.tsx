@@ -38,9 +38,14 @@ function StoreRow({
       }`}
     >
       <div className="flex flex-col gap-2 min-w-0">
-        <span className="text-base leading-6 font-medium truncate" style={{ color: "var(--text)" }}>
-          {store.name}
-        </span>
+        <div className="flex flex-col min-w-0">
+          <span className="text-base leading-6 font-medium truncate" style={{ color: "var(--text)" }}>
+            {store.name}
+          </span>
+          <span className="text-sm truncate" style={{ color: "var(--muted-foreground)" }}>
+            {store.address}
+          </span>
+        </div>
 
         <div className="flex items-center gap-1.5">
           <StatusDot tone={status.tone} />
