@@ -238,7 +238,7 @@ export function getStoreBox(
       case "ej_tillganglig":
         return {
           rows: [
-            { kind: "message", icon: "store", text: "Den här produkten är tillfälligt slut" },
+            { kind: "message", icon: "store", text: "Denna produkt är slut" },
           ],
         };
     }
