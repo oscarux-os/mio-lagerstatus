@@ -393,19 +393,6 @@ export function getOnlineBox(
   const isHomeDelivery = directToCustomer && type === "bestall";
   const deliveryIcon = isHomeDelivery ? "truck" : "package";
 
-  // Online-rutan visas alltid (även för produkter utan onlinesaldo) så att den inte
-  // försvinner när man bläddrar mellan produkter. Saknas ombudskanalen upplyser vi om
-  // det här; hämtning/hemleverans (butikssaldot) bor kvar i butiksrutan.
-  const ombudUnavailable: BoxContent = {
-    rows: [
-      {
-        kind: "message",
-        icon: deliveryIcon,
-        text: "Går inte att beställa till ombud",
-      },
-    ],
-  };
-
   // Möbler (större) utan CL/WL/DI direkt säljs via butikslager och har ingen
   // onlinekanal – då visas ingen online-ruta alls. Hämtning/hemleverans bor i butiksrutan.
   if (type === "bestall" && !directToCustomer) {
@@ -456,10 +443,12 @@ export function getOnlineBox(
           },
         ],
       };
+    // Saknas ombudskanal (enbart butikslager eller helt slut) visas ingen online-ruta –
+    // hämtning/hemleverans (snabbrörligt) bor kvar i butiksrutan.
     case "enbart_bl":
-      return ombudUnavailable;
+      return null;
     case "ej_tillganglig":
-      return ombudUnavailable;
+      return null;
   }
 }
 
