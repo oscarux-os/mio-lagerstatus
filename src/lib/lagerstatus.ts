@@ -206,10 +206,17 @@ export function getStoreBox(
   noStoreSelected: boolean,
   type: ProductType,
   onlineState: OnlineState,
+  lagervaraInStores = false,
 ): BoxContent {
   // Lagervara = centrallager-saldo, ej kopplat till en specifik butik.
   // Visar antal i lager samt både butikshämtning och hemleverans.
   if (type === "lagervara") {
+    // En lagervara kan ibland även finnas fysiskt i butiker. Då erbjuder vi samma
+    // "Hämta direkt i X butiker"-länk som snabb/möbler, så kunden kan hämta direkt
+    // i stället för att vänta på centrallager-leveransen. Länken öppnar butiksväljaren.
+    const storePickupLink = lagervaraInStores
+      ? `Hämta direkt i ${OTHER_STORES_COUNT} andra butiker`
+      : undefined;
     switch (state) {
       case "i_lager":
         return {
@@ -218,6 +225,7 @@ export function getStoreBox(
             { kind: "delivery", icon: "store", text: "Hämta gratis i butik inom 4 dagar" },
             { kind: "delivery", icon: "truck", text: "Hemleverans inom 3–9 dagar" },
           ],
+          footerLink: storePickupLink,
         };
       case "pa_vag_in":
         return {
@@ -226,6 +234,7 @@ export function getStoreBox(
             { kind: "delivery", icon: "store", text: "Hämta gratis i butik från 15 maj" },
             { kind: "delivery", icon: "truck", text: "Hemleverans inom 2–3 veckor" },
           ],
+          footerLink: storePickupLink,
         };
       case "bestallningslage":
         return {
@@ -234,13 +243,23 @@ export function getStoreBox(
             { kind: "delivery", icon: "store", text: "Hämta gratis i butik inom 4–8 veckor" },
             { kind: "delivery", icon: "truck", text: "Hemleverans inom 4–8 veckor" },
           ],
+          footerLink: storePickupLink,
         };
       case "ej_tillganglig":
-        return {
-          rows: [
-            { kind: "message", icon: "store", text: "Denna produkt är slut" },
-          ],
-        };
+        // Slut i centrallager men kan finnas kvar i enstaka butiker: visa då butiks-
+        // tillgängligheten i stället för "slut", med samma hämta-direkt-länk.
+        return lagervaraInStores
+          ? {
+              rows: [
+                { kind: "stock", text: `Finns i ${OTHER_STORES_COUNT} butiker`, tone: "positive" },
+              ],
+              footerLink: storePickupLink,
+            }
+          : {
+              rows: [
+                { kind: "message", icon: "store", text: "Denna produkt är slut" },
+              ],
+            };
     }
   }
 
