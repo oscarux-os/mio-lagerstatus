@@ -22,6 +22,7 @@ export function LagerstatusSimulator() {
   const [type, setType] = useState<ProductType>("snabb");
   const [noStoreSelected, setNoStoreSelected] = useState(false);
   const [directToCustomer, setDirectToCustomer] = useState(false);
+  const [lagervaraInStores, setLagervaraInStores] = useState(false);
   const [storeState, setStoreState] = useState<StoreState>("i_lager");
   const [onlineState, setOnlineState] = useState<OnlineState>("i_lager_cl");
   const [panelOpen, setPanelOpen] = useState(false);
@@ -35,7 +36,7 @@ export function LagerstatusSimulator() {
   const onlineHidden =
     type === "lagervara" || (type === "bestall" && !noStoreSelected && !directToCustomer);
 
-  const storeBox = getStoreBox(storeState, noStoreSelected, type, onlineState);
+  const storeBox = getStoreBox(storeState, noStoreSelected, type, onlineState, lagervaraInStores);
   const onlineBox = getOnlineBox(onlineState, type, directToCustomer);
   const cardStatus = getCardStatus(storeState, onlineState, noStoreSelected, type, directToCustomer);
 
@@ -73,6 +74,9 @@ export function LagerstatusSimulator() {
         <div className="flex flex-col gap-3">
           <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#999]">Kontext</p>
           <CheckRow checked={noStoreSelected} label="Ingen butik vald" onChange={() => setNoStoreSelected((v) => !v)} />
+          {type === "lagervara" && (
+            <CheckRow checked={lagervaraInStores} label="Finns även i butik" onChange={() => setLagervaraInStores((v) => !v)} />
+          )}
           <div className="rounded-lg border border-dashed border-[#ddd] bg-[#fafafa] p-3">
             <p className="text-[9px] font-semibold uppercase tracking-[0.25em] text-[#bbb] mb-2">Framtid</p>
             <CheckRow checked={directToCustomer} label="CL/WL/DI direkt till kund" onChange={() => setDirectToCustomer((v) => !v)} />
