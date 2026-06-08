@@ -406,9 +406,10 @@ export function getOnlineBox(
     ],
   };
 
-  // Möbler utan CL/WL/DI direkt säljs via butikslager och kan aldrig beställas till ombud.
+  // Möbler (större) utan CL/WL/DI direkt säljs via butikslager och har ingen
+  // onlinekanal – då visas ingen online-ruta alls. Hämtning/hemleverans bor i butiksrutan.
   if (type === "bestall" && !directToCustomer) {
-    return ombudUnavailable;
+    return null;
   }
 
   switch (state) {

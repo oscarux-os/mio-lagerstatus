@@ -31,8 +31,8 @@ export function LagerstatusSimulator() {
   const onlineSelectOptions =
     type === "bestall" && directToCustomer ? onlineOptions.snabb : onlineOptions[type];
 
-  // Online-väljaren är inaktiv för lagervara (online-ruta saknas) och för möbler utan
-  // CL/WL/DI direkt (rutan visar ett fast "ej till ombud"-meddelande oavsett saldo).
+  // Online-väljaren är inaktiv för lagervara och för möbler utan CL/WL/DI direkt –
+  // i båda fallen saknas en separat online-ruta på produktsidan.
   const onlineHidden =
     type === "lagervara" || (type === "bestall" && !noStoreSelected && !directToCustomer);
 
