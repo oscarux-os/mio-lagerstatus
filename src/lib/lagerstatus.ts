@@ -382,7 +382,7 @@ export function getOnlineBox(
       {
         kind: "message",
         icon: deliveryIcon,
-        text: "Levereras inte till ombud",
+        text: "Går inte att beställa till ombud",
       },
     ],
   };
