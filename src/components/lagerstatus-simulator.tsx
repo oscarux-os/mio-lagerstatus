@@ -43,7 +43,7 @@ export function LagerstatusSimulator() {
     type === "lagervara" || (type === "bestall" && !noStoreSelected && !directToCustomer);
 
   const storeBox = getStoreBox(storeState, noStoreSelected, selectedStore?.name ?? STORE_NAME, type, onlineState, lagervaraInStores);
-  const onlineBox = getOnlineBox(onlineState, type, directToCustomer);
+  const onlineBox = getOnlineBox(onlineState, type, directToCustomer, noStoreSelected);
   const cardStatus = getCardStatus(storeState, onlineState, noStoreSelected, type, directToCustomer);
 
   function onTypeChange(nextType: ProductType) {
