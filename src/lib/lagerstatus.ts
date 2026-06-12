@@ -33,10 +33,16 @@ export type BoxRow =
       icon: "store" | "truck" | "package";
       text: string;
       price?: string;
+      // Klickbar länk i samma storlek inline efter texten, t.ex. "…inom 4 dagar, byt butik".
+      action?: string;
     }
   | {
       kind: "message";
       icon: "store" | "truck" | "package";
+      text: string;
+    }
+  | {
+      kind: "link";
       text: string;
     };
 
@@ -204,6 +210,7 @@ export function getStoreList(): StoreListItem[] {
 export function getStoreBox(
   state: StoreState,
   noStoreSelected: boolean,
+  storeName: string,
   type: ProductType,
   onlineState: OnlineState,
   lagervaraInStores = false,
@@ -217,13 +224,38 @@ export function getStoreBox(
     const storePickupLink = lagervaraInStores
       ? `Hämta direkt i ${OTHER_STORES_COUNT} andra butiker`
       : undefined;
+
+    // Hämtning/hemleverans är butiksberoende ledtider. Utan vald butik kan vi inte
+    // säga vad som gäller – då visar vi bara det butiksoberoende centrallagersaldot
+    // (kommersiellt) plus en uppmaning; tiderna "låses upp" när butik väljs. Med vald
+    // butik skriver vi ut butiksnamnet på hämtraden så tiden får sin kontext (jfr
+    // butiksrutan nedan, som redan namnger butiken).
+    const pickupPrompt: BoxRow = {
+      kind: "message",
+      icon: "store",
+      text: "Tider för hämtning och hemleverans visas för vald butik",
+    };
+    // Butiksväljaren hänger ihop med butiksnamnet, INTE saldot (centrallager/
+    // butiksoberoende) – annars läses antalet som butikens eget lagersaldo. Med vald
+    // butik ligger "byt butik" därför inline på själva hämtraden (delivery-radens
+    // action); utan vald butik – då finns ingen hämtrad – blir "Välj butik" en egen
+    // länk under prompten. "Hämta direkt i andra butiker" ligger kvar längst ner i foten.
+    const storeSelectLink: BoxRow = {
+      kind: "link",
+      text: "Välj butik",
+    };
+
     switch (state) {
       case "i_lager":
         return {
           rows: [
             { kind: "stock", text: "Online: 24 st i lager", tone: "positive" },
-            { kind: "delivery", icon: "store", text: "Hämta gratis i butik inom 4 dagar" },
-            { kind: "delivery", icon: "truck", text: "Hemleverans inom 3–9 dagar" },
+            ...(noStoreSelected
+              ? [pickupPrompt, storeSelectLink]
+              : [
+                  { kind: "delivery" as const, icon: "store" as const, text: `Hämta gratis hos ${storeName} inom 4 dagar`, action: "byt butik" },
+                  { kind: "delivery" as const, icon: "truck" as const, text: "Hemleverans inom 3–9 dagar" },
+                ]),
           ],
           footerLink: storePickupLink,
         };
@@ -231,8 +263,12 @@ export function getStoreBox(
         return {
           rows: [
             { kind: "eta", text: "På väg in" },
-            { kind: "delivery", icon: "store", text: "Hämta gratis i butik från 15 maj" },
-            { kind: "delivery", icon: "truck", text: "Hemleverans inom 2–3 veckor" },
+            ...(noStoreSelected
+              ? [pickupPrompt, storeSelectLink]
+              : [
+                  { kind: "delivery" as const, icon: "store" as const, text: `Hämta gratis hos ${storeName} från 15 maj`, action: "byt butik" },
+                  { kind: "delivery" as const, icon: "truck" as const, text: "Hemleverans inom 2–3 veckor" },
+                ]),
           ],
           footerLink: storePickupLink,
         };
@@ -240,8 +276,12 @@ export function getStoreBox(
         return {
           rows: [
             { kind: "eta", text: "Beställningsvara" },
-            { kind: "delivery", icon: "store", text: "Hämta gratis i butik inom 4–8 veckor" },
-            { kind: "delivery", icon: "truck", text: "Hemleverans inom 4–8 veckor" },
+            ...(noStoreSelected
+              ? [pickupPrompt, storeSelectLink]
+              : [
+                  { kind: "delivery" as const, icon: "store" as const, text: `Hämta gratis hos ${storeName} inom 4–8 veckor`, action: "byt butik" },
+                  { kind: "delivery" as const, icon: "truck" as const, text: "Hemleverans inom 4–8 veckor" },
+                ]),
           ],
           footerLink: storePickupLink,
         };
@@ -292,7 +332,7 @@ export function getStoreBox(
         rows: [
           {
             kind: "stock",
-            text: `4 st i lager hos ${STORE_NAME}`,
+            text: `4 st i lager hos ${storeName}`,
             tone: "positive",
             action: "Byt butik",
           },
@@ -318,7 +358,7 @@ export function getStoreBox(
         rows: [
           {
             kind: "eta",
-            text: `På väg till ${STORE_NAME}`,
+            text: `På väg till ${storeName}`,
             action: "Byt butik",
           },
           {
@@ -343,7 +383,7 @@ export function getStoreBox(
         rows: [
           {
             kind: "eta",
-            text: `Beställningsvara hos ${STORE_NAME}`,
+            text: `Beställningsvara hos ${storeName}`,
             action: "Byt butik",
           },
           {
