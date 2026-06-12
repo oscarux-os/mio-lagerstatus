@@ -69,10 +69,18 @@ export function LagerstatusSimulator() {
         <div className="h-px bg-[#ebebeb]" />
 
         <div className="flex flex-col gap-4">
-          <div className={onlineHidden ? "opacity-40" : ""}>
-            <SelectField label="Online" value={onlineState} disabled={onlineHidden} options={onlineSelectOptions} onChange={(v) => setOnlineState(v as OnlineState)} />
-          </div>
-          <SelectField label="Butik" value={storeState} disabled={noStoreSelected} options={storeOptions[type]} onChange={(v) => setStoreState(v as StoreState)} />
+          {/* Lagervara har ingen separat online-ruta – dess lagerstatus ÄR online-saldot
+              och styrs av "Online"-väljaren nedan. Den dedikerade online-väljaren döljs
+              därför helt för lagervara (för möbler utan ombudskanal visas den nedtonad). */}
+          {type !== "lagervara" && (
+            <div className={onlineHidden ? "opacity-40" : ""}>
+              <SelectField label="Online" value={onlineState} disabled={onlineHidden} options={onlineSelectOptions} onChange={(v) => setOnlineState(v as OnlineState)} />
+            </div>
+          )}
+          {/* För lagervara ÄR detta online-lagerstatusen (gäller oavsett butiksval, går att
+              ändra utan vald butik) och heter därför "Online". För snabb/möbler är det den
+              valda butikens eget saldo och saknar mening utan vald butik → då disablad. */}
+          <SelectField label={type === "lagervara" ? "Online" : "Butik"} value={storeState} disabled={noStoreSelected && type !== "lagervara"} options={storeOptions[type]} onChange={(v) => setStoreState(v as StoreState)} />
         </div>
 
         <div className="h-px bg-[#ebebeb]" />
