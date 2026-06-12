@@ -7,11 +7,17 @@ import {
   getStoreBox,
   onlineOptions,
   storeOptions,
+  STORES,
+  STORE_NAME,
   type OnlineState,
   type ProductType,
   type StoreInfo,
   type StoreState,
 } from "@/lib/lagerstatus";
+
+// Default-butik för prototypen så rutan har ett konkret butiksnamn innan användaren
+// öppnat butiksväljaren. Speglas sedan av det faktiska valet via onSelect.
+const DEFAULT_STORE = STORES.find((store) => store.id === "kungens-kurva");
 import { ClockIcon, LagerstatusBoxes } from "./status-card";
 import { StoreSelectorPanel } from "./store-selector-panel";
 
@@ -26,7 +32,7 @@ export function LagerstatusSimulator() {
   const [storeState, setStoreState] = useState<StoreState>("i_lager");
   const [onlineState, setOnlineState] = useState<OnlineState>("i_lager_cl");
   const [panelOpen, setPanelOpen] = useState(false);
-  const [selectedStore, setSelectedStore] = useState<StoreInfo | undefined>(undefined);
+  const [selectedStore, setSelectedStore] = useState<StoreInfo | undefined>(DEFAULT_STORE);
 
   const onlineSelectOptions =
     type === "bestall" && directToCustomer ? onlineOptions.snabb : onlineOptions[type];
@@ -36,7 +42,7 @@ export function LagerstatusSimulator() {
   const onlineHidden =
     type === "lagervara" || (type === "bestall" && !noStoreSelected && !directToCustomer);
 
-  const storeBox = getStoreBox(storeState, noStoreSelected, type, onlineState, lagervaraInStores);
+  const storeBox = getStoreBox(storeState, noStoreSelected, selectedStore?.name ?? STORE_NAME, type, onlineState, lagervaraInStores);
   const onlineBox = getOnlineBox(onlineState, type, directToCustomer);
   const cardStatus = getCardStatus(storeState, onlineState, noStoreSelected, type, directToCustomer);
 
@@ -119,7 +125,11 @@ export function LagerstatusSimulator() {
         onClose={() => setPanelOpen(false)}
         onSelect={(store) => {
           setSelectedStore(store);
-          setStoreState(store.state);
+          // Lagervara speglar centrallagrets status, inte butikens eget hyllsaldo:
+          // att byta upphämtningsbutik ska bara byta namn/ledtid på hämtraden, inte
+          // slå om lagerstatusen. För snabb/möbler ÄR butikens eget saldo det rutan
+          // visar, så där följer storeState med valet som vanligt.
+          if (type !== "lagervara") setStoreState(store.state);
           setNoStoreSelected(false);
         }}
       />

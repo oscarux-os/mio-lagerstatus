@@ -89,12 +89,20 @@ function EtaRow({ row, onAction }: { row: Extract<BoxRow, { kind: "eta" }>; onAc
   );
 }
 
-function DeliveryRow({ row }: { row: Extract<BoxRow, { kind: "delivery" }> }) {
+function DeliveryRow({ row, onAction }: { row: Extract<BoxRow, { kind: "delivery" }>; onAction?: () => void }) {
   return (
     <div className="flex items-center gap-1.5 w-full">
       <span className="shrink-0" style={{ color: "var(--muted-foreground)" }}>{iconForSlot(row.icon)}</span>
-      <p className="flex-1 min-w-0 text-sm leading-5 tracking-[-0.05px] whitespace-nowrap" style={{ color: "var(--text)" }}>
+      <p className={`flex-1 min-w-0 text-sm leading-5 tracking-[-0.05px] ${row.action ? "" : "whitespace-nowrap"}`} style={{ color: "var(--text)" }}>
         {row.text}
+        {row.action && (
+          <>
+            {", "}
+            <button onClick={onAction} className="underline underline-offset-2" style={{ color: "var(--text)" }}>
+              {row.action}
+            </button>
+          </>
+        )}
       </p>
       {row.price && (
         <p className="shrink-0 text-sm leading-5 tracking-[-0.05px] whitespace-nowrap" style={{ color: "var(--text)" }}>
@@ -116,10 +124,23 @@ function MessageRow({ row }: { row: Extract<BoxRow, { kind: "message" }> }) {
   );
 }
 
+function LinkRow({ row, onAction }: { row: Extract<BoxRow, { kind: "link" }>; onAction?: () => void }) {
+  return (
+    <div className="flex items-center gap-1.5 w-full">
+      {/* Tom ikon-bredd så länktexten linjerar med delivery-radernas text ovanför */}
+      <span className="shrink-0 w-4" />
+      <button onClick={onAction} className="text-sm leading-5 tracking-[-0.05px] underline underline-offset-2 text-left" style={{ color: "var(--text)" }}>
+        {row.text}
+      </button>
+    </div>
+  );
+}
+
 function BoxRowView({ row, onAction }: { row: BoxRow; onAction?: () => void }) {
   if (row.kind === "stock")    return <StockRow row={row} onAction={onAction} />;
   if (row.kind === "eta")      return <EtaRow row={row} onAction={onAction} />;
-  if (row.kind === "delivery") return <DeliveryRow row={row} />;
+  if (row.kind === "delivery") return <DeliveryRow row={row} onAction={onAction} />;
+  if (row.kind === "link")     return <LinkRow row={row} onAction={onAction} />;
   return <MessageRow row={row} />;
 }
 
@@ -144,7 +165,7 @@ export function StatusCard({ content, position = "only", onAction }: { content: 
       {stockRows.map((row, i) => <BoxRowView key={i} row={row} onAction={onAction} />)}
       {deliveryRows.length > 0 && (
         <div className="flex flex-col gap-1">
-          {deliveryRows.map((row, i) => <BoxRowView key={i} row={row} />)}
+          {deliveryRows.map((row, i) => <BoxRowView key={i} row={row} onAction={onAction} />)}
         </div>
       )}
       {content.footerLink && (
