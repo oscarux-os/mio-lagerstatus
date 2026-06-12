@@ -40,10 +40,8 @@ export type BoxRow =
       kind: "message";
       icon: "store" | "truck" | "package";
       text: string;
-    }
-  | {
-      kind: "link";
-      text: string;
+      // Klickbar länk i samma storlek inline före texten, t.ex. "Välj butik för att …".
+      action?: string;
     };
 
 export type BoxContent = {
@@ -221,28 +219,26 @@ export function getStoreBox(
     // En lagervara kan ibland även finnas fysiskt i butiker. Då erbjuder vi samma
     // "Hämta direkt i X butiker"-länk som snabb/möbler, så kunden kan hämta direkt
     // i stället för att vänta på centrallager-leveransen. Länken öppnar butiksväljaren.
+    // Utan vald butik finns ingen "egen" butik att jämföra mot – då heter länken
+    // "Hämta direkt i N butiker"; med vald butik blir det "N andra butiker".
     const storePickupLink = lagervaraInStores
-      ? `Hämta direkt i ${OTHER_STORES_COUNT} andra butiker`
+      ? noStoreSelected
+        ? `Hämta direkt i ${OTHER_STORES_COUNT} butiker`
+        : `Hämta direkt i ${OTHER_STORES_COUNT} andra butiker`
       : undefined;
 
-    // Hämtning/hemleverans är butiksberoende ledtider. Utan vald butik kan vi inte
-    // säga vad som gäller – då visar vi bara det butiksoberoende centrallagersaldot
-    // (kommersiellt) plus en uppmaning; tiderna "låses upp" när butik väljs. Med vald
-    // butik skriver vi ut butiksnamnet på hämtraden så tiden får sin kontext (jfr
-    // butiksrutan nedan, som redan namnger butiken).
+    // Hämtning/hemleverans är butiksberoende ledtider. Utan vald butik kan vi inte säga
+    // vad som gäller – då visar vi bara det butiksoberoende centrallagersaldot
+    // (kommersiellt) plus en uppmaning där "Välj butik" är en inline-länk på samma rad
+    // (samma mönster som "byt butik" på hämtraden). Tiderna "låses upp" när butik väljs;
+    // med vald butik skriver vi ut butiksnamnet på hämtraden så tiden får sin kontext.
+    // Butiksväljaren hänger alltså ihop med butiken, INTE saldot – annars läses antalet
+    // som butikens eget lagersaldo. "Hämta direkt i …" ligger kvar längst ner i foten.
     const pickupPrompt: BoxRow = {
       kind: "message",
       icon: "store",
-      text: "Tider för hämtning och hemleverans visas för vald butik",
-    };
-    // Butiksväljaren hänger ihop med butiksnamnet, INTE saldot (centrallager/
-    // butiksoberoende) – annars läses antalet som butikens eget lagersaldo. Med vald
-    // butik ligger "byt butik" därför inline på själva hämtraden (delivery-radens
-    // action); utan vald butik – då finns ingen hämtrad – blir "Välj butik" en egen
-    // länk under prompten. "Hämta direkt i andra butiker" ligger kvar längst ner i foten.
-    const storeSelectLink: BoxRow = {
-      kind: "link",
-      text: "Välj butik",
+      action: "Välj butik",
+      text: "för att se tider för hämtning och hemleverans",
     };
 
     switch (state) {
@@ -251,7 +247,7 @@ export function getStoreBox(
           rows: [
             { kind: "stock", text: "Online: 24 st i lager", tone: "positive" },
             ...(noStoreSelected
-              ? [pickupPrompt, storeSelectLink]
+              ? [pickupPrompt]
               : [
                   { kind: "delivery" as const, icon: "store" as const, text: `Hämta gratis hos ${storeName} inom 4 dagar`, action: "byt butik" },
                   { kind: "delivery" as const, icon: "truck" as const, text: "Hemleverans inom 3–9 dagar" },
@@ -264,7 +260,7 @@ export function getStoreBox(
           rows: [
             { kind: "eta", text: "På väg in" },
             ...(noStoreSelected
-              ? [pickupPrompt, storeSelectLink]
+              ? [pickupPrompt]
               : [
                   { kind: "delivery" as const, icon: "store" as const, text: `Hämta gratis hos ${storeName} från 15 maj`, action: "byt butik" },
                   { kind: "delivery" as const, icon: "truck" as const, text: "Hemleverans inom 2–3 veckor" },
@@ -277,7 +273,7 @@ export function getStoreBox(
           rows: [
             { kind: "eta", text: "Beställningsvara" },
             ...(noStoreSelected
-              ? [pickupPrompt, storeSelectLink]
+              ? [pickupPrompt]
               : [
                   { kind: "delivery" as const, icon: "store" as const, text: `Hämta gratis hos ${storeName} inom 4–8 veckor`, action: "byt butik" },
                   { kind: "delivery" as const, icon: "truck" as const, text: "Hemleverans inom 4–8 veckor" },
@@ -422,6 +418,7 @@ export function getOnlineBox(
   state: OnlineState,
   type: ProductType,
   directToCustomer: boolean,
+  noStoreSelected: boolean,
 ): BoxContent | null {
   // Lagervara har ingen separat online-ruta – dess enda ruta ÄR centrallagersaldot.
   if (type === "lagervara") {
@@ -431,7 +428,7 @@ export function getOnlineBox(
   // CL/WL/DI direkt till kund visas som hemleverans (lastbil, utan pris); annars leverans till ombud (paket).
   // Priset bakas in i ombud-texten (jfr "Hämta gratis i butik …") istället för en separat prislapp.
   const isHomeDelivery = directToCustomer && type === "bestall";
-  const deliveryIcon = isHomeDelivery ? "truck" : "package";
+  const deliveryIcon: "store" | "truck" | "package" = isHomeDelivery ? "truck" : "package";
 
   // Möbler (större) utan CL/WL/DI direkt säljs via butikslager och har ingen
   // onlinekanal – då visas ingen online-ruta alls. Hämtning/hemleverans bor i butiksrutan.
@@ -439,6 +436,8 @@ export function getOnlineBox(
     return null;
   }
 
+  // Leveranstider beror på leveransadress (likt butiksrutans hämt-/hemleverans). Utan
+  // vald butik döljer vi därför leveransraderna och visar bara lagerstatusen online.
   switch (state) {
     case "i_lager_cl":
       return {
@@ -448,11 +447,15 @@ export function getOnlineBox(
             text: "Online: 100 st i lager",
             tone: "positive",
           },
-          {
-            kind: "delivery",
-            icon: deliveryIcon,
-            text: isHomeDelivery ? "Hemleverans inom 3–9 dagar" : "Levereras inom 2–5 dagar, från 49 kr",
-          },
+          ...(noStoreSelected
+            ? []
+            : [
+                {
+                  kind: "delivery" as const,
+                  icon: deliveryIcon,
+                  text: isHomeDelivery ? "Hemleverans inom 3–9 dagar" : "Levereras inom 2–5 dagar, från 49 kr",
+                },
+              ]),
         ],
       };
     case "pa_vag_in":
@@ -462,11 +465,15 @@ export function getOnlineBox(
             kind: "eta",
             text: "På väg in online",
           },
-          {
-            kind: "delivery",
-            icon: deliveryIcon,
-            text: isHomeDelivery ? "Hemleverans inom 2–3 veckor" : "Levereras inom 2–3 veckor, från 49 kr",
-          },
+          ...(noStoreSelected
+            ? []
+            : [
+                {
+                  kind: "delivery" as const,
+                  icon: deliveryIcon,
+                  text: isHomeDelivery ? "Hemleverans inom 2–3 veckor" : "Levereras inom 2–3 veckor, från 49 kr",
+                },
+              ]),
         ],
       };
     case "bestallningslage":
@@ -476,11 +483,15 @@ export function getOnlineBox(
             kind: "eta",
             text: isHomeDelivery ? "Beställ online" : "Beställningsvara online",
           },
-          {
-            kind: "delivery",
-            icon: deliveryIcon,
-            text: isHomeDelivery ? "Hemleverans inom 4–8 veckor" : "Levereras inom 4–8 veckor, från 49 kr",
-          },
+          ...(noStoreSelected
+            ? []
+            : [
+                {
+                  kind: "delivery" as const,
+                  icon: deliveryIcon,
+                  text: isHomeDelivery ? "Hemleverans inom 4–8 veckor" : "Levereras inom 4–8 veckor, från 49 kr",
+                },
+              ]),
         ],
       };
     // Saknas ombudskanal (enbart butikslager eller helt slut) visas ingen online-ruta –
