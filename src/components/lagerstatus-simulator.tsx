@@ -95,7 +95,7 @@ export function LagerstatusSimulator() {
               valda butikens eget saldo och saknar mening utan vald butik → då disablad. */}
           <SelectField label={type === "lagervara" ? "Online" : "Butik"} value={storeState} disabled={noStoreSelected && type !== "lagervara"} options={storeOptions[type]} onChange={(v) => setStoreState(v as StoreState)} />
           {/* "Finns i vald butik" styr butikens eget saldo (butiksrutan + Butik-väljaren nedan) och
-              hör därför hemma här hos saldot. Utesluter "Finns även i butik" (som ligger i Kontext). */}
+              hör därför hemma här hos saldot. Utesluter "Finns i andra butiker" (som ligger i Kontext). */}
           {type === "lagervara" && (
             <CheckRow
               checked={lagervaraInSelectedStore}
@@ -134,7 +134,7 @@ export function LagerstatusSimulator() {
           {type === "lagervara" && (
             <CheckRow
               checked={lagervaraInStores}
-              label="Finns även i butik"
+              label="Finns i andra butiker"
               onChange={() => {
                 const next = !lagervaraInStores;
                 setLagervaraInStores(next);
