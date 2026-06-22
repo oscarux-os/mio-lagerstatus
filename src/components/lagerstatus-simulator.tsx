@@ -3,7 +3,7 @@
 import { useState } from "react";
 import {
   getCardStatus,
-  getLagervaraOnlineBox,
+  getLagervaraBox,
   getOnlineBox,
   getStoreBox,
   onlineOptions,
@@ -47,22 +47,37 @@ export function LagerstatusSimulator() {
   // Butiksprimär lagervara visar den valda butikens eget saldo. Mock-butiker som inte är "i lager"
   // har 0 i saldo – då "finns i vald butik" är ett manuellt override-läge faller vi tillbaka på 4.
   const lagervaraStoreCount = selectedStore?.stockCount || 4;
-  const storeBox = getStoreBox(storeState, noStoreSelected, selectedStore?.name ?? STORE_NAME, type, onlineState, lagervaraInStores, lagervaraInSelectedStore, lagervaraStoreCount, lagervaraStoreState);
-  // Lagervara har normalt ingen online-ruta (saldot bor i butiksrutan). Undantag: finns varan i
-  // den valda butiken OCH butiken har den i lager visar vi en strippad "finns även online"-ruta
-  // ovanför – bara närvaro, ingen leveransrad. Är butiken på väg in / beställning / slut går hela
-  // leveranshistorien via butiksrutan i stället. storeState = online-/centrallagerstatusen.
-  const onlineBox =
+  // Lagervara: en enad ruta med fasta rader (butik · online · hämta · hemleverans) i stället för
+  // den kanaluppdelade butiks-/online-rutan. "storeState" är här centrallagrets (online) status.
+  const storeBox =
     type === "lagervara"
-      ? getLagervaraOnlineBox(storeState, lagervaraStoreState, selectedStore?.name ?? STORE_NAME, lagervaraInSelectedStore, noStoreSelected)
-      : getOnlineBox(onlineState, type, noStoreSelected);
+      ? getLagervaraBox({
+          noStoreSelected,
+          storeName: selectedStore?.name ?? STORE_NAME,
+          onlineState: storeState,
+          inSelectedStore: lagervaraInSelectedStore,
+          storeShelfState: lagervaraStoreState,
+          storeStockCount: lagervaraStoreCount,
+          inOtherStores: lagervaraInStores,
+        })
+      : getStoreBox(storeState, noStoreSelected, selectedStore?.name ?? STORE_NAME, type, onlineState, lagervaraInStores, lagervaraInSelectedStore, lagervaraStoreCount, lagervaraStoreState);
+  // Lagervara har ingen separat online-ruta längre – online-saldot bor i den enade rutan ovan.
+  const onlineBox = type === "lagervara" ? null : getOnlineBox(onlineState, type, noStoreSelected);
   const cardStatus = getCardStatus(storeState, onlineState, noStoreSelected, type);
 
   function onTypeChange(nextType: ProductType) {
     setType(nextType);
     setStoreState("i_lager");
     setOnlineState("i_lager_cl");
-    setLagervaraStoreState("i_lager");
+    // Lagervara speglar den valda butikens egen status (så "i lager / beställs till", hämttid
+    // och hemleverans stämmer med butiken). Finns en vald butik utgår vi från dess status.
+    if (nextType === "lagervara" && selectedStore && !noStoreSelected) {
+      setLagervaraStoreState(selectedStore.state);
+      setLagervaraInSelectedStore(true);
+    } else {
+      setLagervaraStoreState("i_lager");
+      setLagervaraInSelectedStore(false);
+    }
   }
 
   return (
@@ -180,11 +195,16 @@ export function LagerstatusSimulator() {
         onClose={() => setPanelOpen(false)}
         onSelect={(store) => {
           setSelectedStore(store);
-          // Lagervara speglar centrallagrets status, inte butikens eget hyllsaldo:
-          // att byta upphämtningsbutik ska bara byta namn/ledtid på hämtraden, inte
-          // slå om lagerstatusen. För snabb/möbler ÄR butikens eget saldo det rutan
-          // visar, så där följer storeState med valet som vanligt.
-          if (type !== "lagervara") setStoreState(store.state);
+          if (type === "lagervara") {
+            // Lagervara: byt upphämtningsbutik → spegla butikens egen status så att hela rutan
+            // (i lager / beställs till, hämttid, hemleverans) stämmer skarpt med vald butik.
+            // Centrallagrets (online) status ligger kvar och styrs separat av "Online"-väljaren.
+            setLagervaraStoreState(store.state);
+            setLagervaraInSelectedStore(true);
+          } else {
+            // Snabb/möbler: butikens eget saldo ÄR rutan, så storeState följer valet.
+            setStoreState(store.state);
+          }
           setNoStoreSelected(false);
         }}
       />
