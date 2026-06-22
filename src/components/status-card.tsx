@@ -132,10 +132,21 @@ function MessageRow({ row, onAction }: { row: Extract<BoxRow, { kind: "message" 
   );
 }
 
+function NoticeRow({ row }: { row: Extract<BoxRow, { kind: "notice" }> }) {
+  return (
+    <div className="w-full px-4 py-4" style={{ background: "var(--info-bg)" }}>
+      <p className="text-base leading-6 tracking-[-0.2px]" style={{ color: "var(--info-text)" }}>
+        {row.text}
+      </p>
+    </div>
+  );
+}
+
 function BoxRowView({ row, onAction }: { row: BoxRow; onAction?: () => void }) {
   if (row.kind === "stock")    return <StockRow row={row} onAction={onAction} />;
   if (row.kind === "eta")      return <EtaRow row={row} onAction={onAction} />;
   if (row.kind === "delivery") return <DeliveryRow row={row} onAction={onAction} />;
+  if (row.kind === "notice")   return <NoticeRow row={row} />;
   return <MessageRow row={row} onAction={onAction} />;
 }
 

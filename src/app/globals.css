@@ -13,6 +13,10 @@
   --border-subtle: #cecece;
   --text: #000000;
   --dot-muted: #c7c7c2;
+
+  /* Info-meddelande (t.ex. "Välj butik för att se tider …") */
+  --info-bg: #e9f1f9;
+  --info-text: #15506b;
 }
 
 @theme inline {

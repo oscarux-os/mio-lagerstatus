@@ -42,6 +42,12 @@ export type BoxRow =
       text: string;
       // Klickbar länk i samma storlek inline före texten, t.ex. "Välj butik för att …".
       action?: string;
+    }
+  | {
+      // Fylld info-box (ljusblå) som ersätter leveransraderna, t.ex. uppmaningen att välja
+      // butik för att se hämt-/hemleveranstider. Ingen ikon, ingen inline-länk.
+      kind: "notice";
+      text: string;
     };
 
 export type BoxContent = {
@@ -610,25 +616,19 @@ export function getLagervaraBox(params: {
       : { rows: [{ kind: "message", icon: "store", text: "Denna produkt är slut" }] };
   }
 
-  // Rad 1 – butik.
-  // - På hyllan i vald butik → saldot ("X st i lager hos …"), grön prick.
+  // Rad 1 – butik. Alltid en grön prick-rad; texten hålls KONSTANT så åtgärden är tydlig –
+  // väntan/status (på väg in / beställning) lever på online-raden (rad 2), inte här.
+  // - På hyllan i vald butik → saldot ("X st i lager hos …").
   // - Ingen butik vald men finns fysiskt i butiker → "Finns i N butiker" (starkaste positiva).
-  // - Annars kommer varan via centrallager → butik, och copyn styrs av ONLINE-statusen:
-  //     online i lager     → "Beställs till <butik>" (grön prick) – snabbt via centrallager
-  //     online på väg in   → "På väg till <butik>" (klocka) – täcker upp: går ej att beställa nu
-  //     online beställning → "Beställningsvara hos <butik>" (klocka)
-  //   "Finns inte hos …" undviks helt – det läser ickekommersiellt fast varan går att få.
+  // - Annars → varan beställs till butik via centrallager → "Beställs till <butik>" / "Beställs
+  //   till butik". "Finns inte hos …" undviks – det läser ickekommersiellt fast varan går att få.
   let storeRow: BoxRow;
   if (inStoreNow) {
     storeRow = { kind: "stock", text: `${storeStockCount} st i lager hos ${storeName}`, tone: "positive", action: storeAction };
   } else if (noStoreSelected && inOtherStores) {
     storeRow = { kind: "stock", text: `Finns i ${OTHER_STORES_COUNT} butiker`, tone: "positive", action: storeAction };
-  } else if (onlineState === "i_lager") {
-    storeRow = { kind: "stock", text: noStoreSelected ? "Beställs till butik" : `Beställs till ${storeName}`, tone: "positive", action: storeAction };
-  } else if (onlineState === "pa_vag_in") {
-    storeRow = { kind: "eta", text: noStoreSelected ? "På väg in till butik" : `På väg till ${storeName}`, action: storeAction };
   } else {
-    storeRow = { kind: "eta", text: noStoreSelected ? "Beställningsvara till butik" : `Beställningsvara hos ${storeName}`, action: storeAction };
+    storeRow = { kind: "stock", text: noStoreSelected ? "Beställs till butik" : `Beställs till ${storeName}`, tone: "positive", action: storeAction };
   }
 
   // Rad 2 – online/centrallager. Wording speglar getOnlineBox: i lager = prick-saldo, på väg in /
@@ -644,6 +644,14 @@ export function getLagervaraBox(params: {
     onlineRow = { kind: "stock", text: "Slutsåld online", tone: "muted" };
   }
 
+  // Utan vald butik kan vi inte ange hämt-/hemleveranstider (de är butiksberoende) → ersätt de
+  // raderna med en info-box som uppmanar till butiksval. Saldoraderna (1–2) ligger kvar.
+  if (noStoreSelected) {
+    return {
+      rows: [storeRow, onlineRow, { kind: "notice", text: "Välj butik för att se tider för hämtning och hemleverans." }],
+    };
+  }
+
   // Rad 3 (hämta i butik) + rad 4 (hemleverans från butik). På hyllan → hämta 60 min, hemleverans
   // 3–5 dagar. Annars kommer varan via centrallager → butik och tiderna följer online-statusen.
   // Leveransen routas alltid via butik, vilket skrivs ut ("från butik") för tydlighet.
@@ -652,9 +660,11 @@ export function getLagervaraBox(params: {
   if (inStoreNow) {
     pickupTiming = "inom 60 minuter";
     homeTiming = "inom 3–5 dagar";
+    // På väg in = satt ankomstdatum (centrallager → butik), så hämtraden visar datumet
+    // ("från 15 maj") precis som de andra rutorna; hemleverans behåller intervallet.
   } else {
     pickupTiming =
-      onlineState === "pa_vag_in" ? "inom 2–3 veckor" : onlineState === "bestallningslage" ? "inom 4–8 veckor" : "inom 3–5 dagar";
+      onlineState === "pa_vag_in" ? "från 15 maj" : onlineState === "bestallningslage" ? "inom 4–8 veckor" : "inom 3–5 dagar";
     homeTiming =
       onlineState === "pa_vag_in" ? "inom 2–3 veckor" : onlineState === "bestallningslage" ? "inom 4–8 veckor" : "inom 5–9 vardagar";
   }
