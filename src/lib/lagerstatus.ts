@@ -212,7 +212,10 @@ export function getStoreBox(
   type: ProductType,
   onlineState: OnlineState,
   lagervaraInStores = false,
-): BoxContent {
+  lagervaraInSelectedStore = false,
+  storeStockCount = 0,
+  lagervaraStoreState: StoreState = "i_lager",
+): BoxContent | null {
   // Lagervara = centrallager-saldo, ej kopplat till en specifik butik.
   // Visar antal i lager samt både butikshämtning och hemleverans.
   if (type === "lagervara") {
@@ -226,6 +229,31 @@ export function getStoreBox(
         ? `Hämta direkt i ${OTHER_STORES_COUNT} butiker`
         : `Hämta direkt i ${OTHER_STORES_COUNT} andra butiker`
       : undefined;
+
+    // Finns varan fysiskt i den valda butiken kan kunden hämta direkt (60 min) i stället för
+    // att vänta på centrallager-leveransen. Då blir butiken den primära rutan och bär hela
+    // leveranshistorien (hämtning + hemleverans); online visas som en kompletterande, strippad
+    // "finns även online"-ruta ovanför (se getLagervaraOnlineBox). Gäller bara med vald butik.
+    if (lagervaraInSelectedStore && !noStoreSelected) {
+      // Butiken har varan i lager → butiksrutan är primär och bär hela leveranshistorien (hämtning
+      // + hemleverans). Online visas då bara som strippat komplement (se getLagervaraOnlineBox).
+      if (lagervaraStoreState === "i_lager") {
+        return {
+          rows: [
+            { kind: "stock", text: `${storeStockCount} st i lager hos ${storeName}`, tone: "positive", action: "Byt butik" },
+            { kind: "delivery", icon: "store", text: "Hämta gratis i butik inom 60 minuter" },
+            { kind: "delivery", icon: "truck", text: "Hemleverans inom 3–9 dagar" },
+          ],
+          footerLink: storePickupLink,
+        };
+      }
+      // Butiken har den INTE i lager (på väg in / beställning / slut): köpet går via online, som då
+      // bär leveransen – butiksrutan döljs helt (return null). Saknas varan även online (state =
+      // ej_tillganglig) finns inget att köpa någonstans → visa "slut" i stället för en tom vy.
+      return state === "ej_tillganglig"
+        ? { rows: [{ kind: "message", icon: "store", text: "Denna produkt är slut" }] }
+        : null;
+    }
 
     // Hämtning/hemleverans är butiksberoende ledtider. Utan vald butik kan vi inte säga
     // vad som gäller – då visar vi bara det butiksoberoende centrallagersaldot
@@ -417,7 +445,6 @@ export function getStoreBox(
 export function getOnlineBox(
   state: OnlineState,
   type: ProductType,
-  directToCustomer: boolean,
   noStoreSelected: boolean,
 ): BoxContent | null {
   // Lagervara har ingen separat online-ruta – dess enda ruta ÄR centrallagersaldot.
@@ -425,17 +452,14 @@ export function getOnlineBox(
     return null;
   }
 
-  // CL/WL/DI direkt till kund visas som hemleverans (lastbil, utan pris); annars leverans till ombud (paket).
-  // Priset bakas in i ombud-texten (jfr "Hämta gratis i butik …") istället för en separat prislapp.
-  const isHomeDelivery = directToCustomer && type === "bestall";
-  const deliveryIcon: "store" | "truck" | "package" = isHomeDelivery ? "truck" : "package";
-
-  // Möbler (större) utan CL/WL/DI direkt säljs via butikslager och har ingen
-  // onlinekanal – då visas ingen online-ruta alls. Hämtning/hemleverans bor i butiksrutan.
-  if (type === "bestall" && !directToCustomer) {
+  // Möbler (större) säljs via butikslager och har ingen onlinekanal – då visas ingen
+  // online-ruta alls. Hämtning/hemleverans bor i butiksrutan.
+  if (type === "bestall") {
     return null;
   }
 
+  // Online levereras till ombud (paket). Priset bakas in i texten (jfr "Hämta gratis i butik …")
+  // istället för en separat prislapp.
   // Leveranstider beror på leveransadress (likt butiksrutans hämt-/hemleverans). Utan
   // vald butik döljer vi därför leveransraderna och visar bara lagerstatusen online.
   switch (state) {
@@ -452,8 +476,8 @@ export function getOnlineBox(
             : [
                 {
                   kind: "delivery" as const,
-                  icon: deliveryIcon,
-                  text: isHomeDelivery ? "Hemleverans inom 3–9 dagar" : "Levereras inom 2–5 dagar, från 49 kr",
+                  icon: "package" as const,
+                  text: "Levereras inom 2–5 dagar, från 49 kr",
                 },
               ]),
         ],
@@ -470,8 +494,8 @@ export function getOnlineBox(
             : [
                 {
                   kind: "delivery" as const,
-                  icon: deliveryIcon,
-                  text: isHomeDelivery ? "Hemleverans inom 2–3 veckor" : "Levereras inom 2–3 veckor, från 49 kr",
+                  icon: "package" as const,
+                  text: "Levereras inom 2–3 veckor, från 49 kr",
                 },
               ]),
         ],
@@ -481,15 +505,15 @@ export function getOnlineBox(
         rows: [
           {
             kind: "eta",
-            text: isHomeDelivery ? "Beställ online" : "Beställningsvara online",
+            text: "Beställningsvara online",
           },
           ...(noStoreSelected
             ? []
             : [
                 {
                   kind: "delivery" as const,
-                  icon: deliveryIcon,
-                  text: isHomeDelivery ? "Hemleverans inom 4–8 veckor" : "Levereras inom 4–8 veckor, från 49 kr",
+                  icon: "package" as const,
+                  text: "Levereras inom 4–8 veckor, från 49 kr",
                 },
               ]),
         ],
@@ -503,12 +527,51 @@ export function getOnlineBox(
   }
 }
 
+// Online-ruta för lagervara i "finns i vald butik"-läget. Har butiken varan i lager fungerar den
+// som ett KOMPLEMENT ("finns i butik – dessutom fler online") och visas strippad, utan leveransrad
+// (butiksrutan bär leveransen). Har butiken den INTE i lager (på väg in / beställning / slut) går
+// köpet via online och då bär online-rutan leveransen: hämta i butik OCH hemleverans. Båda matar
+// från onlinelagret, så tiderna följer online-statusen – hämtning i butik går snabbt (online→butik,
+// ~3 dagar) när online finns i lager, oavsett butikens egen påfyllning. Utan vald butik: ingen ruta.
+export function getLagervaraOnlineBox(
+  onlineState: StoreState,
+  storeOwnState: StoreState,
+  storeName: string,
+  lagervaraInSelectedStore: boolean,
+  noStoreSelected: boolean,
+): BoxContent | null {
+  if (!lagervaraInSelectedStore || noStoreSelected || onlineState === "ej_tillganglig") return null;
+
+  // Lead-rad = online-statusen.
+  const lead: BoxRow =
+    onlineState === "i_lager"
+      ? { kind: "stock", text: "Online: 24 st i lager", tone: "positive" }
+      : { kind: "eta", text: onlineState === "pa_vag_in" ? "På väg in online" : "Beställningsvara online" };
+
+  // Butiken har varan i lager → strippat komplement, butiksrutan bär leveransen.
+  if (storeOwnState === "i_lager") return { rows: [lead] };
+
+  // Butiken har den inte i lager → online bär leveransen. Både hämtning och hemleverans matar från
+  // onlinelagret, så tiderna följer online-statusen; hämtning i butik (online→butik) är snabb.
+  const pickupTiming =
+    onlineState === "i_lager" ? "inom 3 dagar" : onlineState === "pa_vag_in" ? "inom 2–3 veckor" : "inom 4–8 veckor";
+  const homeTiming =
+    onlineState === "i_lager" ? "inom 3–9 dagar" : onlineState === "pa_vag_in" ? "inom 2–3 veckor" : "inom 4–8 veckor";
+
+  return {
+    rows: [
+      lead,
+      { kind: "delivery", icon: "store", text: `Hämta gratis hos ${storeName} ${pickupTiming}`, action: "byt butik" },
+      { kind: "delivery", icon: "truck", text: `Hemleverans ${homeTiming}` },
+    ],
+  };
+}
+
 export function getCardStatus(
   storeState: StoreState,
   onlineState: OnlineState,
   noStoreSelected: boolean,
   type: ProductType,
-  directToCustomer: boolean,
 ): CardStatus {
   const storeInStock = storeState === "i_lager";
   const onlineInStock = onlineState === "i_lager_cl";
@@ -541,7 +604,7 @@ export function getCardStatus(
       sublabel: type === "bestall" ? "4–8 v" : undefined,
     };
   }
-  if (type === "bestall" && !directToCustomer && storeState !== "ej_tillganglig") {
+  if (type === "bestall" && storeState !== "ej_tillganglig") {
     return { tone: "neutral", label: "Beställningsvara", sublabel: "4–8 v" };
   }
   return { tone: "gray", label: "Tillfälligt slut" };
@@ -552,7 +615,6 @@ export function getScenarioLabel(
   storeState: StoreState,
   onlineState: OnlineState,
   noStoreSelected: boolean,
-  directToCustomer: boolean,
 ): string {
   const typeLabel =
     type === "snabb" ? "Snabbrörlig" : type === "lagervara" ? "Lagervara" : "Möbler (större)";
@@ -562,15 +624,11 @@ export function getScenarioLabel(
   const onlineLabel =
     type === "lagervara"
       ? "Döljs (via butik)"
-      : type === "bestall" && !noStoreSelected && !directToCustomer
+      : type === "bestall" && !noStoreSelected
       ? "Döljs (BL-driven)"
-      : getOptionLabel(
-          onlineState,
-          type === "bestall" && directToCustomer ? onlineOptions.snabb : onlineOptions[type],
-        );
-  const directLabel = directToCustomer ? " · CL/WL/DI direkt" : "";
+      : getOptionLabel(onlineState, onlineOptions[type]);
 
-  return `${typeLabel}${directLabel} · Butik: ${storeLabel} · Online: ${onlineLabel}`;
+  return `${typeLabel} · Butik: ${storeLabel} · Online: ${onlineLabel}`;
 }
 
 function getOptionLabel<T extends string>(id: T, options: Option<T>[]) {
