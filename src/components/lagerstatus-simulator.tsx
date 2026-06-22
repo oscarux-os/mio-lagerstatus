@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   getCardStatus,
+  getLagervaraOnlineBox,
   getOnlineBox,
   getStoreBox,
   onlineOptions,
@@ -27,29 +28,41 @@ export function LagerstatusSimulator() {
   const [tab, setTab] = useState<Tab>("produktsida");
   const [type, setType] = useState<ProductType>("snabb");
   const [noStoreSelected, setNoStoreSelected] = useState(false);
-  const [directToCustomer, setDirectToCustomer] = useState(false);
   const [lagervaraInStores, setLagervaraInStores] = useState(false);
+  const [lagervaraInSelectedStore, setLagervaraInSelectedStore] = useState(false);
   const [storeState, setStoreState] = useState<StoreState>("i_lager");
+  // Lagervarans butiksruta i "finns i vald butik"-läget har ett eget scenario (i lager / på väg
+  // in / beställningsläge / slut), skilt från online-/centrallagerstatusen i storeState.
+  const [lagervaraStoreState, setLagervaraStoreState] = useState<StoreState>("i_lager");
   const [onlineState, setOnlineState] = useState<OnlineState>("i_lager_cl");
   const [panelOpen, setPanelOpen] = useState(false);
   const [selectedStore, setSelectedStore] = useState<StoreInfo | undefined>(DEFAULT_STORE);
 
-  const onlineSelectOptions =
-    type === "bestall" && directToCustomer ? onlineOptions.snabb : onlineOptions[type];
+  const onlineSelectOptions = onlineOptions[type];
 
-  // Online-väljaren är inaktiv för lagervara och för möbler utan CL/WL/DI direkt –
+  // Online-väljaren är inaktiv för lagervara och för möbler (säljs via butikslager) –
   // i båda fallen saknas en separat online-ruta på produktsidan.
-  const onlineHidden =
-    type === "lagervara" || (type === "bestall" && !noStoreSelected && !directToCustomer);
+  const onlineHidden = type === "lagervara" || (type === "bestall" && !noStoreSelected);
 
-  const storeBox = getStoreBox(storeState, noStoreSelected, selectedStore?.name ?? STORE_NAME, type, onlineState, lagervaraInStores);
-  const onlineBox = getOnlineBox(onlineState, type, directToCustomer, noStoreSelected);
-  const cardStatus = getCardStatus(storeState, onlineState, noStoreSelected, type, directToCustomer);
+  // Butiksprimär lagervara visar den valda butikens eget saldo. Mock-butiker som inte är "i lager"
+  // har 0 i saldo – då "finns i vald butik" är ett manuellt override-läge faller vi tillbaka på 4.
+  const lagervaraStoreCount = selectedStore?.stockCount || 4;
+  const storeBox = getStoreBox(storeState, noStoreSelected, selectedStore?.name ?? STORE_NAME, type, onlineState, lagervaraInStores, lagervaraInSelectedStore, lagervaraStoreCount, lagervaraStoreState);
+  // Lagervara har normalt ingen online-ruta (saldot bor i butiksrutan). Undantag: finns varan i
+  // den valda butiken OCH butiken har den i lager visar vi en strippad "finns även online"-ruta
+  // ovanför – bara närvaro, ingen leveransrad. Är butiken på väg in / beställning / slut går hela
+  // leveranshistorien via butiksrutan i stället. storeState = online-/centrallagerstatusen.
+  const onlineBox =
+    type === "lagervara"
+      ? getLagervaraOnlineBox(storeState, lagervaraStoreState, selectedStore?.name ?? STORE_NAME, lagervaraInSelectedStore, noStoreSelected)
+      : getOnlineBox(onlineState, type, noStoreSelected);
+  const cardStatus = getCardStatus(storeState, onlineState, noStoreSelected, type);
 
   function onTypeChange(nextType: ProductType) {
     setType(nextType);
     setStoreState("i_lager");
     setOnlineState("i_lager_cl");
+    setLagervaraStoreState("i_lager");
   }
 
   return (
@@ -77,24 +90,58 @@ export function LagerstatusSimulator() {
               <SelectField label="Online" value={onlineState} disabled={onlineHidden} options={onlineSelectOptions} onChange={(v) => setOnlineState(v as OnlineState)} />
             </div>
           )}
-          {/* För lagervara ÄR detta online-lagerstatusen (gäller oavsett butiksval, går att
-              ändra utan vald butik) och heter därför "Online". För snabb/möbler är det den
+          {/* För lagervara ÄR detta online-/centrallagerstatusen (gäller oavsett butiksval, går
+              att ändra utan vald butik) och heter därför "Online". För snabb/möbler är det den
               valda butikens eget saldo och saknar mening utan vald butik → då disablad. */}
           <SelectField label={type === "lagervara" ? "Online" : "Butik"} value={storeState} disabled={noStoreSelected && type !== "lagervara"} options={storeOptions[type]} onChange={(v) => setStoreState(v as StoreState)} />
+          {/* "Finns i vald butik" styr butikens eget saldo (butiksrutan + Butik-väljaren nedan) och
+              hör därför hemma här hos saldot. Utesluter "Finns även i butik" (som ligger i Kontext). */}
+          {type === "lagervara" && (
+            <CheckRow
+              checked={lagervaraInSelectedStore}
+              label="Finns i vald butik"
+              onChange={() => {
+                const next = !lagervaraInSelectedStore;
+                setLagervaraInSelectedStore(next);
+                if (next) {
+                  setLagervaraInStores(false);
+                  setNoStoreSelected(false);
+                }
+              }}
+            />
+          )}
+          {/* I vald butik: separat butikssaldo-scenario för butiksrutan, skilt från "Online" ovan. */}
+          {type === "lagervara" && lagervaraInSelectedStore && (
+            <SelectField label="Butik" value={lagervaraStoreState} disabled={false} options={storeOptions.lagervara} onChange={(v) => setLagervaraStoreState(v as StoreState)} />
+          )}
         </div>
 
         <div className="h-px bg-[#ebebeb]" />
 
         <div className="flex flex-col gap-3">
           <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#999]">Kontext</p>
-          <CheckRow checked={noStoreSelected} label="Ingen butik vald" onChange={() => setNoStoreSelected((v) => !v)} />
+          <CheckRow
+            checked={noStoreSelected}
+            label="Ingen butik vald"
+            onChange={() => {
+              const next = !noStoreSelected;
+              setNoStoreSelected(next);
+              // "Finns i vald butik"-läget kräver en vald butik – släck det utan butik.
+              if (next) setLagervaraInSelectedStore(false);
+            }}
+          />
+          {/* Kontext: lägger bara till en "hämta direkt i N butiker"-länk, har inget eget saldo. */}
           {type === "lagervara" && (
-            <CheckRow checked={lagervaraInStores} label="Finns även i butik" onChange={() => setLagervaraInStores((v) => !v)} />
+            <CheckRow
+              checked={lagervaraInStores}
+              label="Finns även i butik"
+              onChange={() => {
+                const next = !lagervaraInStores;
+                setLagervaraInStores(next);
+                if (next) setLagervaraInSelectedStore(false);
+              }}
+            />
           )}
-          <div className="rounded-lg border border-dashed border-[#ddd] bg-[#fafafa] p-3">
-            <p className="text-[9px] font-semibold uppercase tracking-[0.25em] text-[#bbb] mb-2">Framtid</p>
-            <CheckRow checked={directToCustomer} label="CL/WL/DI direkt till kund" onChange={() => setDirectToCustomer((v) => !v)} />
-          </div>
         </div>
       </aside>
 

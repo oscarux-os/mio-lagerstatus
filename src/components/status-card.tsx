@@ -177,14 +177,15 @@ export function LagerstatusBoxes({
   onlineContent,
   onStoreAction,
 }: {
-  storeContent: BoxContent;
+  storeContent: BoxContent | null;
   onlineContent: BoxContent | null;
   onStoreAction?: () => void;
 }) {
+  const both = Boolean(storeContent && onlineContent);
   return (
     <div className="flex flex-col gap-px w-full bg-[var(--border-subtle)]">
-      {onlineContent && <StatusCard content={onlineContent} position="first" />}
-      <StatusCard content={storeContent} position={onlineContent ? "last" : "only"} onAction={onStoreAction} />
+      {onlineContent && <StatusCard content={onlineContent} position={both ? "first" : "only"} onAction={onStoreAction} />}
+      {storeContent && <StatusCard content={storeContent} position={both ? "last" : "only"} onAction={onStoreAction} />}
     </div>
   );
 }
