@@ -567,6 +567,103 @@ export function getLagervaraOnlineBox(
   };
 }
 
+// --- Lagervara: en enad ruta -----------------------------------------------
+// Lagervara säljs alltid via butik (även hemleveransen routas dit), så kanal-
+// uppdelningen online/butik tas bort. I stället en enda ruta med FASTA rader vars
+// innehåll byts mellan tillstånd – inga rader tillkommer eller faller bort, så
+// layouten står still (ingen "hoppighet" beroende på butiksval). Raderna:
+//   1. butiksstatus · 2. onlinestatus · 3. hämta i butik · 4. hemleverans från butik
+// Rad 1–2 visar "i lager" som grön prick och på väg in / beställningsläge som klock-rad,
+// med samma wording som de andra rutorna (getStoreBox / getOnlineBox).
+export function getLagervaraBox(params: {
+  noStoreSelected: boolean;
+  storeName: string;
+  // Centrallagrets (online) status – finns oavsett butiksval och bär leveranstiderna.
+  onlineState: StoreState;
+  // Förs varan av den valda butiken och står den på hyllan just nu? Avgör 60-min-hämtning.
+  inSelectedStore: boolean;
+  storeShelfState: StoreState;
+  storeStockCount: number;
+  // Finns kvar i enstaka andra butiker → "Hämta direkt i N …"-länk i foten.
+  inOtherStores: boolean;
+}): BoxContent {
+  const { noStoreSelected, storeName, onlineState, inSelectedStore, storeShelfState, storeStockCount, inOtherStores } = params;
+
+  // Hämta-direkt-länken i foten pekar på ANDRA butiker än den valda – meningslös utan vald
+  // butik (då bär rad 1 + "Välj butik" den rollen i stället).
+  const otherStoresLink = inOtherStores && !noStoreSelected ? `Hämta direkt i ${OTHER_STORES_COUNT} andra butiker` : undefined;
+
+  // Butiksväljaren hänger på rad 1: utan vald butik "Välj butik", med vald butik "Byt butik".
+  const storeAction = noStoreSelected ? "Välj butik" : "Byt butik";
+
+  // Lagervara fylls från centrallagret (online), så det är ONLINE-statusen – inte butikens eget
+  // hyllsaldo – som styr om/när varan kan tas till butik. Butikens roll är binär: står den på
+  // hyllan just nu (i lager) kan kunden hämta inom 60 min; annars kommer den via centrallager.
+  const inStoreNow = !noStoreSelected && inSelectedStore && storeShelfState === "i_lager";
+
+  // Inget online OCH inte på hyllan i vald butik → kan inte tas via centrallager → butik. Finns
+  // den kvar i andra butiker pekar vi dit, annars helt slut. (Genuint annan situation – att den
+  // ser annorlunda ut än köpflödet är ok.)
+  if (onlineState === "ej_tillganglig" && !inStoreNow) {
+    return inOtherStores
+      ? { rows: [{ kind: "stock", text: `Finns i ${OTHER_STORES_COUNT} butiker`, tone: "positive", action: storeAction }] }
+      : { rows: [{ kind: "message", icon: "store", text: "Denna produkt är slut" }] };
+  }
+
+  // Rad 1 – butik.
+  // - På hyllan i vald butik → saldot ("X st i lager hos …"), grön prick.
+  // - Ingen butik vald men finns fysiskt i butiker → "Finns i N butiker" (starkaste positiva).
+  // - Annars kommer varan via centrallager → butik, och copyn styrs av ONLINE-statusen:
+  //     online i lager     → "Beställs till <butik>" (grön prick) – snabbt via centrallager
+  //     online på väg in   → "På väg till <butik>" (klocka) – täcker upp: går ej att beställa nu
+  //     online beställning → "Beställningsvara hos <butik>" (klocka)
+  //   "Finns inte hos …" undviks helt – det läser ickekommersiellt fast varan går att få.
+  let storeRow: BoxRow;
+  if (inStoreNow) {
+    storeRow = { kind: "stock", text: `${storeStockCount} st i lager hos ${storeName}`, tone: "positive", action: storeAction };
+  } else if (noStoreSelected && inOtherStores) {
+    storeRow = { kind: "stock", text: `Finns i ${OTHER_STORES_COUNT} butiker`, tone: "positive", action: storeAction };
+  } else if (onlineState === "i_lager") {
+    storeRow = { kind: "stock", text: noStoreSelected ? "Beställs till butik" : `Beställs till ${storeName}`, tone: "positive", action: storeAction };
+  } else if (onlineState === "pa_vag_in") {
+    storeRow = { kind: "eta", text: noStoreSelected ? "På väg in till butik" : `På väg till ${storeName}`, action: storeAction };
+  } else {
+    storeRow = { kind: "eta", text: noStoreSelected ? "Beställningsvara till butik" : `Beställningsvara hos ${storeName}`, action: storeAction };
+  }
+
+  // Rad 2 – online/centrallager. Wording speglar getOnlineBox: i lager = prick-saldo, på väg in /
+  // beställningsläge = klock-rad ("På väg in online" / "Beställningsvara online"), slut = dämpat.
+  let onlineRow: BoxRow;
+  if (onlineState === "i_lager") {
+    onlineRow = { kind: "stock", text: "Online: 100+ st i lager", tone: "positive" };
+  } else if (onlineState === "pa_vag_in") {
+    onlineRow = { kind: "eta", text: "På väg in online" };
+  } else if (onlineState === "bestallningslage") {
+    onlineRow = { kind: "eta", text: "Beställningsvara online" };
+  } else {
+    onlineRow = { kind: "stock", text: "Slutsåld online", tone: "muted" };
+  }
+
+  // Rad 3 (hämta i butik) + rad 4 (hemleverans från butik). På hyllan → hämta 60 min, hemleverans
+  // 3–5 dagar. Annars kommer varan via centrallager → butik och tiderna följer online-statusen.
+  // Leveransen routas alltid via butik, vilket skrivs ut ("från butik") för tydlighet.
+  let pickupTiming: string;
+  let homeTiming: string;
+  if (inStoreNow) {
+    pickupTiming = "inom 60 minuter";
+    homeTiming = "inom 3–5 dagar";
+  } else {
+    pickupTiming =
+      onlineState === "pa_vag_in" ? "inom 2–3 veckor" : onlineState === "bestallningslage" ? "inom 4–8 veckor" : "inom 3–5 dagar";
+    homeTiming =
+      onlineState === "pa_vag_in" ? "inom 2–3 veckor" : onlineState === "bestallningslage" ? "inom 4–8 veckor" : "inom 5–9 vardagar";
+  }
+  const pickupRow: BoxRow = { kind: "delivery", icon: "store", text: `Hämta gratis i butik ${pickupTiming}` };
+  const homeRow: BoxRow = { kind: "delivery", icon: "truck", text: `Hemleverans från butik ${homeTiming}` };
+
+  return { rows: [storeRow, onlineRow, pickupRow, homeRow], footerLink: otherStoresLink };
+}
+
 export function getCardStatus(
   storeState: StoreState,
   onlineState: OnlineState,
