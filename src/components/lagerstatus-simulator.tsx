@@ -29,10 +29,9 @@ export function LagerstatusSimulator() {
   const [type, setType] = useState<ProductType>("snabb");
   const [noStoreSelected, setNoStoreSelected] = useState(false);
   const [lagervaraInStores, setLagervaraInStores] = useState(false);
-  const [lagervaraInSelectedStore, setLagervaraInSelectedStore] = useState(false);
   const [storeState, setStoreState] = useState<StoreState>("i_lager");
-  // Lagervarans butiksruta i "finns i vald butik"-läget har ett eget scenario (i lager / på väg
-  // in / beställningsläge / slut), skilt från online-/centrallagerstatusen i storeState.
+  // Lagervarans butiksruta har ett eget scenario (i lager / på väg in / beställningsläge / slut)
+  // via "Butik"-väljaren, skilt från online-/centrallagerstatusen i storeState.
   const [lagervaraStoreState, setLagervaraStoreState] = useState<StoreState>("i_lager");
   const [onlineState, setOnlineState] = useState<OnlineState>("i_lager_cl");
   const [panelOpen, setPanelOpen] = useState(false);
@@ -48,19 +47,19 @@ export function LagerstatusSimulator() {
   // har 0 i saldo – då "finns i vald butik" är ett manuellt override-läge faller vi tillbaka på 4.
   const lagervaraStoreCount = selectedStore?.stockCount || 4;
   // Lagervara: en enad ruta med fasta rader (butik · online · hämta · hemleverans) i stället för
-  // den kanaluppdelade butiks-/online-rutan. "storeState" är här centrallagrets (online) status.
+  // den kanaluppdelade butiks-/online-rutan. "storeState" är här centrallagrets (online) status,
+  // och "Butik"-väljaren (lagervaraStoreState) styr den valda butikens egen status.
   const storeBox =
     type === "lagervara"
       ? getLagervaraBox({
           noStoreSelected,
           storeName: selectedStore?.name ?? STORE_NAME,
           onlineState: storeState,
-          inSelectedStore: lagervaraInSelectedStore,
           storeShelfState: lagervaraStoreState,
           storeStockCount: lagervaraStoreCount,
           inOtherStores: lagervaraInStores,
         })
-      : getStoreBox(storeState, noStoreSelected, selectedStore?.name ?? STORE_NAME, type, onlineState, lagervaraInStores, lagervaraInSelectedStore, lagervaraStoreCount, lagervaraStoreState);
+      : getStoreBox(storeState, noStoreSelected, selectedStore?.name ?? STORE_NAME, type, onlineState, lagervaraInStores, false, lagervaraStoreCount, lagervaraStoreState);
   // Lagervara har ingen separat online-ruta längre – online-saldot bor i den enade rutan ovan.
   const onlineBox = type === "lagervara" ? null : getOnlineBox(onlineState, type, noStoreSelected);
   const cardStatus = getCardStatus(storeState, onlineState, noStoreSelected, type);
@@ -71,13 +70,7 @@ export function LagerstatusSimulator() {
     setOnlineState("i_lager_cl");
     // Lagervara speglar den valda butikens egen status (så "i lager / beställs till", hämttid
     // och hemleverans stämmer med butiken). Finns en vald butik utgår vi från dess status.
-    if (nextType === "lagervara" && selectedStore && !noStoreSelected) {
-      setLagervaraStoreState(selectedStore.state);
-      setLagervaraInSelectedStore(true);
-    } else {
-      setLagervaraStoreState("i_lager");
-      setLagervaraInSelectedStore(false);
-    }
+    setLagervaraStoreState(nextType === "lagervara" && selectedStore && !noStoreSelected ? selectedStore.state : "i_lager");
   }
 
   return (
@@ -109,25 +102,11 @@ export function LagerstatusSimulator() {
               att ändra utan vald butik) och heter därför "Online". För snabb/möbler är det den
               valda butikens eget saldo och saknar mening utan vald butik → då disablad. */}
           <SelectField label={type === "lagervara" ? "Online" : "Butik"} value={storeState} disabled={noStoreSelected && type !== "lagervara"} options={storeOptions[type]} onChange={(v) => setStoreState(v as StoreState)} />
-          {/* "Finns i vald butik" styr butikens eget saldo (butiksrutan + Butik-väljaren nedan) och
-              hör därför hemma här hos saldot. Utesluter "Finns i andra butiker" (som ligger i Kontext). */}
+          {/* Lagervara: "Butik"-väljaren styr den valda butikens egen status (i lager / på väg in /
+              beställningsläge / slut). "Ej tillgänglig" = butiken för inte varan → tas dit via
+              centrallager. Disablad utan vald butik (då finns ingen butiksstatus att visa). */}
           {type === "lagervara" && (
-            <CheckRow
-              checked={lagervaraInSelectedStore}
-              label="Finns i vald butik"
-              onChange={() => {
-                const next = !lagervaraInSelectedStore;
-                setLagervaraInSelectedStore(next);
-                if (next) {
-                  setLagervaraInStores(false);
-                  setNoStoreSelected(false);
-                }
-              }}
-            />
-          )}
-          {/* I vald butik: separat butikssaldo-scenario för butiksrutan, skilt från "Online" ovan. */}
-          {type === "lagervara" && lagervaraInSelectedStore && (
-            <SelectField label="Butik" value={lagervaraStoreState} disabled={false} options={storeOptions.lagervara} onChange={(v) => setLagervaraStoreState(v as StoreState)} />
+            <SelectField label="Butik" value={lagervaraStoreState} disabled={noStoreSelected} options={storeOptions.lagervara} onChange={(v) => setLagervaraStoreState(v as StoreState)} />
           )}
         </div>
 
@@ -138,23 +117,14 @@ export function LagerstatusSimulator() {
           <CheckRow
             checked={noStoreSelected}
             label="Ingen butik vald"
-            onChange={() => {
-              const next = !noStoreSelected;
-              setNoStoreSelected(next);
-              // "Finns i vald butik"-läget kräver en vald butik – släck det utan butik.
-              if (next) setLagervaraInSelectedStore(false);
-            }}
+            onChange={() => setNoStoreSelected(!noStoreSelected)}
           />
           {/* Kontext: lägger bara till en "hämta direkt i N butiker"-länk, har inget eget saldo. */}
           {type === "lagervara" && (
             <CheckRow
               checked={lagervaraInStores}
               label="Finns i andra butiker"
-              onChange={() => {
-                const next = !lagervaraInStores;
-                setLagervaraInStores(next);
-                if (next) setLagervaraInSelectedStore(false);
-              }}
+              onChange={() => setLagervaraInStores(!lagervaraInStores)}
             />
           )}
         </div>
@@ -200,7 +170,6 @@ export function LagerstatusSimulator() {
             // (i lager / beställs till, hämttid, hemleverans) stämmer skarpt med vald butik.
             // Centrallagrets (online) status ligger kvar och styrs separat av "Online"-väljaren.
             setLagervaraStoreState(store.state);
-            setLagervaraInSelectedStore(true);
           } else {
             // Snabb/möbler: butikens eget saldo ÄR rutan, så storeState följer valet.
             setStoreState(store.state);
