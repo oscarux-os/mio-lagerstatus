@@ -452,6 +452,11 @@ export function getOnlineBox(
   state: OnlineState,
   type: ProductType,
   noStoreSelected: boolean,
+  // Vissa snabbrörliga produkter går inte att skicka till ombud alls (t.ex. skrymmande
+  // eller ömtåliga varor) – oberoende av lagerstatusen. Kunder har missuppfattat detta
+  // som att ombud ändå erbjuds (så som snabbrörligt normalt fungerar), så när flaggan är
+  // false ersätts leveransraden med en tydlig info-box i stället för paketleverans.
+  ombudAvailable = true,
 ): BoxContent | null {
   // Lagervara har ingen separat online-ruta – dess enda ruta ÄR centrallagersaldot.
   if (type === "lagervara") {
@@ -464,10 +469,17 @@ export function getOnlineBox(
     return null;
   }
 
+  const noOmbudNotice: BoxRow = {
+    kind: "notice",
+    text: "Denna produkt levereras inte till ombud.",
+  };
+
   // Online levereras till ombud (paket). Priset bakas in i texten (jfr "Hämta gratis i butik …")
   // istället för en separat prislapp.
   // Leveranstider beror på leveransadress (likt butiksrutans hämt-/hemleverans). Utan
   // vald butik döljer vi därför leveransraderna och visar bara lagerstatusen online.
+  // Går produkten inte via ombud visas info-boxen ändå, oavsett butiksval – det är en
+  // egenskap hos produkten, inte en leveranstid som beror på adress.
   switch (state) {
     case "i_lager_cl":
       return {
@@ -477,15 +489,17 @@ export function getOnlineBox(
             text: "Online: 100 st i lager",
             tone: "positive",
           },
-          ...(noStoreSelected
-            ? []
-            : [
-                {
-                  kind: "delivery" as const,
-                  icon: "package" as const,
-                  text: "Levereras inom 2–5 dagar, från 49 kr",
-                },
-              ]),
+          ...(!ombudAvailable
+            ? [noOmbudNotice]
+            : noStoreSelected
+              ? []
+              : [
+                  {
+                    kind: "delivery" as const,
+                    icon: "package" as const,
+                    text: "Levereras inom 2–5 dagar, från 49 kr",
+                  },
+                ]),
         ],
       };
     case "pa_vag_in":
@@ -495,15 +509,17 @@ export function getOnlineBox(
             kind: "eta",
             text: "På väg in online",
           },
-          ...(noStoreSelected
-            ? []
-            : [
-                {
-                  kind: "delivery" as const,
-                  icon: "package" as const,
-                  text: "Levereras inom 2–3 veckor, från 49 kr",
-                },
-              ]),
+          ...(!ombudAvailable
+            ? [noOmbudNotice]
+            : noStoreSelected
+              ? []
+              : [
+                  {
+                    kind: "delivery" as const,
+                    icon: "package" as const,
+                    text: "Levereras inom 2–3 veckor, från 49 kr",
+                  },
+                ]),
         ],
       };
     case "bestallningslage":
@@ -513,15 +529,17 @@ export function getOnlineBox(
             kind: "eta",
             text: "Beställningsvara online",
           },
-          ...(noStoreSelected
-            ? []
-            : [
-                {
-                  kind: "delivery" as const,
-                  icon: "package" as const,
-                  text: "Levereras inom 4–8 veckor, från 49 kr",
-                },
-              ]),
+          ...(!ombudAvailable
+            ? [noOmbudNotice]
+            : noStoreSelected
+              ? []
+              : [
+                  {
+                    kind: "delivery" as const,
+                    icon: "package" as const,
+                    text: "Levereras inom 4–8 veckor, från 49 kr",
+                  },
+                ]),
         ],
       };
     // Saknas ombudskanal (enbart butikslager eller helt slut) visas ingen online-ruta –

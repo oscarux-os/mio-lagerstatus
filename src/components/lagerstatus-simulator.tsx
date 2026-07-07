@@ -34,6 +34,9 @@ export function LagerstatusSimulator() {
   // via "Butik"-väljaren, skilt från online-/centrallagerstatusen i storeState.
   const [lagervaraStoreState, setLagervaraStoreState] = useState<StoreState>("i_lager");
   const [onlineState, setOnlineState] = useState<OnlineState>("i_lager_cl");
+  // Vissa snabbrörliga produkter går inte att skicka till ombud alls, oavsett lagerstatus
+  // (t.ex. skrymmande varor) – en egen switch skild från online-lagerstatusen.
+  const [ombudAvailable, setOmbudAvailable] = useState(true);
   const [panelOpen, setPanelOpen] = useState(false);
   const [selectedStore, setSelectedStore] = useState<StoreInfo | undefined>(DEFAULT_STORE);
 
@@ -61,13 +64,14 @@ export function LagerstatusSimulator() {
         })
       : getStoreBox(storeState, noStoreSelected, selectedStore?.name ?? STORE_NAME, type, onlineState, lagervaraInStores, false, lagervaraStoreCount, lagervaraStoreState);
   // Lagervara har ingen separat online-ruta längre – online-saldot bor i den enade rutan ovan.
-  const onlineBox = type === "lagervara" ? null : getOnlineBox(onlineState, type, noStoreSelected);
+  const onlineBox = type === "lagervara" ? null : getOnlineBox(onlineState, type, noStoreSelected, ombudAvailable);
   const cardStatus = getCardStatus(storeState, onlineState, noStoreSelected, type);
 
   function onTypeChange(nextType: ProductType) {
     setType(nextType);
     setStoreState("i_lager");
     setOnlineState("i_lager_cl");
+    setOmbudAvailable(true);
     // Lagervara speglar den valda butikens egen status (så "i lager / beställs till", hämttid
     // och hemleverans stämmer med butiken). Finns en vald butik utgår vi från dess status.
     setLagervaraStoreState(nextType === "lagervara" && selectedStore && !noStoreSelected ? selectedStore.state : "i_lager");
@@ -97,6 +101,15 @@ export function LagerstatusSimulator() {
             <div className={onlineHidden ? "opacity-40" : ""}>
               <SelectField label="Online" value={onlineState} disabled={onlineHidden} options={onlineSelectOptions} onChange={(v) => setOnlineState(v as OnlineState)} />
             </div>
+          )}
+          {/* Vissa snabbrörliga produkter går inte att skicka till ombud alls, oavsett
+              lagerstatus (t.ex. skrymmande varor) – skild från online-lagerstatusen ovan. */}
+          {type === "snabb" && (
+            <CheckRow
+              checked={ombudAvailable}
+              label="Går att få via ombud"
+              onChange={() => setOmbudAvailable(!ombudAvailable)}
+            />
           )}
           {/* För lagervara ÄR detta online-/centrallagerstatusen (gäller oavsett butiksval, går
               att ändra utan vald butik) och heter därför "Online". För snabb/möbler är det den
