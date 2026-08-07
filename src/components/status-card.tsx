@@ -41,6 +41,16 @@ export function PackageIcon() {
   );
 }
 
+function InfoIcon({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="var(--info-icon)" className="shrink-0">
+      <circle cx="12" cy="12" r="10" />
+      <rect x="11" y="10" width="2" height="7" rx="1" fill="white" />
+      <circle cx="12" cy="7.2" r="1.3" fill="white" />
+    </svg>
+  );
+}
+
 function iconForSlot(slot: "store" | "truck" | "package") {
   if (slot === "store") return <StoreIcon />;
   if (slot === "package") return <PackageIcon />;
@@ -134,8 +144,9 @@ function MessageRow({ row, onAction }: { row: Extract<BoxRow, { kind: "message" 
 
 function NoticeRow({ row }: { row: Extract<BoxRow, { kind: "notice" }> }) {
   return (
-    <div className="w-full px-4 py-4" style={{ background: "var(--info-bg)" }}>
-      <p className="text-base leading-6 tracking-[-0.2px]" style={{ color: "var(--info-text)" }}>
+    <div className="w-full px-4 py-4 flex items-start gap-2.5" style={{ background: "var(--info-bg)" }}>
+      <InfoIcon />
+      <p className="flex-1 min-w-0 text-base leading-6 tracking-[-0.2px]" style={{ color: "var(--info-text)" }}>
         {row.text}
       </p>
     </div>

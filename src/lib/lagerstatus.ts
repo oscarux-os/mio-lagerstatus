@@ -11,6 +11,19 @@ export type OnlineState =
   | "enbart_bl"
   | "ej_tillganglig";
 
+// Lagervarans BUTIKSSTATUS beskriver bara det butiksspecifika: hyllsaldo, en inleverans på väg
+// eller ingetdera. Beställningsläge saknas medvetet – för en lagervara ÄR butikens beställnings-
+// kanal centrallagrets (butiken lägger ingen egen leverantörsorder, det gör bara möbler), så det
+// läget bor på online-/CL-statusen. Att utesluta det i typen gör kombinationen "slut online men
+// beställningsbar i butik" omöjlig att representera i stället för bara osannolik att visa.
+export type LagervaraStoreState = Exclude<StoreState, "bestallningslage">;
+
+// Butiksväljarens mock-status gäller alla produkttyper. För en lagervara betyder en butik i
+// beställningsläge att butiken inte för varan själv – den tas dit via centrallagret.
+export function toLagervaraStoreState(state: StoreState): LagervaraStoreState {
+  return state === "bestallningslage" ? "ej_tillganglig" : state;
+}
+
 export type Option<T extends string> = {
   id: T;
   label: string;
@@ -44,8 +57,8 @@ export type BoxRow =
       action?: string;
     }
   | {
-      // Fylld info-box (ljusblå) som ersätter leveransraderna, t.ex. uppmaningen att välja
-      // butik för att se hämt-/hemleveranstider. Ingen ikon, ingen inline-länk.
+      // Fylld info-box (ljusblå) med info-ikon, t.ex. uppmaningen att välja butik för att
+      // se hämt-/hemleveranstider. Ingen inline-länk.
       kind: "notice";
       text: string;
     };
@@ -64,6 +77,9 @@ export type CardStatus = {
 export const STORE_NAME = "Mio Kungens Kurva";
 export const STORE_COUNT = 12;
 export const OTHER_STORES_COUNT = 5;
+// Butiker med en redan lagd inleverans på väg in. Eget antal – det är sällan samma butiker som
+// har varan på hyllan just nu.
+export const INCOMING_STORES_COUNT = 3;
 
 // --- Butiksval-panel: data per butik ---------------------------------------
 
@@ -140,6 +156,8 @@ export const storeOptions: Record<ProductType, Option<StoreState>[]> = {
     { id: "bestallningslage", label: "Beställningsläge" },
     { id: "ej_tillganglig", label: "Ej tillgänglig" },
   ],
+  // OBS: för lagervara driver den här listan ONLINE-/centrallagerstatusen (dess butiksruta har
+  // ingen egen kanal). Butiksstatusen har en egen, kortare lista – se lagervaraStoreOptions.
   lagervara: [
     { id: "i_lager", label: "I lager" },
     { id: "pa_vag_in", label: "På väg in" },
@@ -147,6 +165,13 @@ export const storeOptions: Record<ProductType, Option<StoreState>[]> = {
     { id: "ej_tillganglig", label: "Ej tillgänglig" },
   ],
 };
+
+// Lagervarans butiksstatus – utan beställningsläge, se LagervaraStoreState.
+export const lagervaraStoreOptions: Option<LagervaraStoreState>[] = [
+  { id: "i_lager", label: "I lager" },
+  { id: "pa_vag_in", label: "På väg in" },
+  { id: "ej_tillganglig", label: "Ej tillgänglig" },
+];
 
 export const onlineOptions: Record<ProductType, Option<OnlineState>[]> = {
   snabb: [
@@ -604,14 +629,19 @@ export function getLagervaraBox(params: {
   storeName: string;
   // Centrallagrets (online) status – finns oavsett butiksval och bär leveranstiderna.
   onlineState: StoreState;
-  // Den valda butikens egen status (i lager → 60 min; på väg in → satt datum; beställning/slut
-  // → varan tas dit via centrallager). "Ej tillgänglig" = butiken för inte varan själv.
-  storeShelfState: StoreState;
+  // Den valda butikens egen status (i lager → 60 min; på väg in → satt datum; slut → varan tas
+  // dit via centrallager). "Ej tillgänglig" = butiken för inte varan själv. Beställningsläge
+  // finns inte här – det är centrallagrets kanal, se LagervaraStoreState.
+  storeShelfState: LagervaraStoreState;
   storeStockCount: number;
-  // Finns kvar i enstaka andra butiker → "Hämta direkt i N …"-länk i foten.
+  // Finns kvar på hyllan i enstaka andra butiker → "Hämta direkt i N …"-länk i foten.
   inOtherStores: boolean;
+  // Redan lagda inleveranser är på väg in till enstaka butiker. Skilt från inOtherStores: varan
+  // står inte på någon hylla ännu, men landar på ett datum – det är det enda som kan rädda köpet
+  // när centrallagret är helt slut.
+  incomingInOtherStores: boolean;
 }): BoxContent {
-  const { noStoreSelected, storeName, onlineState, storeShelfState, storeStockCount, inOtherStores } = params;
+  const { noStoreSelected, storeName, onlineState, storeShelfState, storeStockCount, inOtherStores, incomingInOtherStores } = params;
 
   // Hämta-direkt-länken i foten pekar på ANDRA butiker än den valda – meningslös utan vald
   // butik (då bär rad 1 + "Välj butik" den rollen i stället).
@@ -620,48 +650,68 @@ export function getLagervaraBox(params: {
   // Butiksväljaren hänger på rad 1: utan vald butik "Välj butik", med vald butik "Byt butik".
   const storeAction = noStoreSelected ? "Välj butik" : "Byt butik";
 
-  // Lagervara fylls normalt från centrallagret (online), så det är oftast ONLINE-statusen som
-  // styr när varan kan tas till butik. Butikens egen status spelar in i två fall:
+  // Lagervara fylls från centrallagret (online), så det är ONLINE-statusen som styr när varan
+  // kan tas till butik – inklusive beställningsläget, som är CL:s kanal. Butikens egen status
+  // är rent butiksspecifik och spelar in i två fall:
   //   - står den på hyllan just nu (i lager) → hämtning inom 60 min.
   //   - har butiken en egen inkommande leverans (på väg in, satt datum) som slår en långsam
   //     online-väg → visa den i stället för "Beställs till"-scenariot (corner case).
+  // Båda svarar på frågor om en specifik butik ("hur många står på hyllan hos X", "vilket datum
+  // landar leveransen hos X") och saknar därför mening utan vald butik.
   const inStoreNow = !noStoreSelected && storeShelfState === "i_lager";
   const storeIncoming = !noStoreSelected && storeShelfState === "pa_vag_in";
-  const storeOrder = !noStoreSelected && storeShelfState === "bestallningslage";
-  // Butikens egen kanal (inkommande leverans med satt datum, eller beställningsvara) tar över
-  // rad 1 + tiderna när onlinevägen är minst lika långsam (online beställningsvara) eller slut –
-  // då är "Beställs till" missvisande och butikens status (klocka) blir tydligare/ärligare.
+  // Butikens egen inleverans (satt datum) tar över rad 1 + tiderna när onlinevägen är minst lika
+  // långsam (online beställningsvara) eller slut – då är "Beställs till" missvisande och butikens
+  // status (klocka) blir tydligare/ärligare.
   const onlineSlowOrGone = onlineState === "bestallningslage" || onlineState === "ej_tillganglig";
   const useStoreIncoming = storeIncoming && onlineSlowOrGone;
-  const useStoreOrder = storeOrder && onlineSlowOrGone;
 
-  // Inget online, inte på hyllan OCH ingen egen butikskanal (inkommande/beställning) → kan inte
-  // tas via centrallager → butik. Finns den kvar i andra butiker pekar vi dit, annars helt slut.
+  // Slut i centrallagret = ingen påfyllning alls (utgången vara) – annars hade den stått i
+  // beställningsläge. Då finns ingen väg CL → butik, och det enda som kan rädda köpet är det
+  // butiksspecifika: hyllsaldo eller en redan lagd inleverans. Saknas även det är varan slut;
+  // finns den kvar i andra butiker pekar vi dit.
   // (Genuint annan situation – att den ser annorlunda ut än köpflödet är ok.)
-  if (onlineState === "ej_tillganglig" && !inStoreNow && !storeIncoming && !storeOrder) {
-    return inOtherStores
-      ? { rows: [{ kind: "stock", text: `Finns i ${OTHER_STORES_COUNT} butiker`, tone: "positive", action: storeAction }] }
-      : { rows: [{ kind: "message", icon: "store", text: "Denna produkt är slut" }] };
+  const noCentralWarehousePath = onlineState === "ej_tillganglig" && !inStoreNow && !storeIncoming;
+  // Undantag: utan vald butik VET vi inte om varan går att få – vi vet bara att den finns kvar
+  // fysiskt i, eller är på väg in till, några butiker. Det är ett obesvarat läge, inte ett
+  // slut-läge, så det ska behålla den vanliga radstrukturen (butik · online · uppmaning) i
+  // stället för att kollapsa till en ensam rad. Skillnaden bärs av info-boxen nedan: där svarar
+  // butiksvalet på var/när varan finns, inte på "vilka tider gäller?" – det finns ingen
+  // centrallagerväg att tidsätta.
+  const unresolvedWithoutStore = noStoreSelected && (inOtherStores || incomingInOtherStores);
+  if (noCentralWarehousePath && !unresolvedWithoutStore) {
+    // Hyllsaldo (hämta direkt) slår inleverans (vänta till ett datum) slår slut.
+    if (inOtherStores) {
+      return { rows: [{ kind: "stock", text: `Finns i ${OTHER_STORES_COUNT} butiker`, tone: "positive", action: storeAction }] };
+    }
+    if (incomingInOtherStores) {
+      // Datumet utelämnas medvetet: inleveranserna landar olika dag i olika butiker, så ett
+      // gemensamt datum vore påhittat. Butiksvalet är det som ger ett skarpt datum.
+      return { rows: [{ kind: "eta", text: `På väg in till ${INCOMING_STORES_COUNT} butiker`, action: storeAction }] };
+    }
+    return { rows: [{ kind: "message", icon: "store", text: "Denna produkt är slut" }] };
   }
 
   // Rad 1 – butik.
   // - På hyllan i vald butik → saldot ("X st i lager hos …"), grön prick.
   // - Egen inkommande leverans som slår onlinevägen → "På väg till <butik>" (klocka).
-  // - Egen beställningsvara när onlinevägen är lika långsam/slut → "Beställningsvara hos <butik>"
-  //   (klocka) – ärligare än "Beställs till" när det i praktiken är ett 4–8-veckors orderläge.
   // - Ingen butik vald men finns fysiskt i butiker → "Finns i N butiker" (starkaste positiva).
+  // - Ingen butik vald, inget hyllsaldo men inleveranser på väg och en långsam/slut onlineväg →
+  //   "På väg in till N butiker" (klocka). Samma regel som useStoreIncoming, fast aggregerad:
+  //   butikernas egen inleverans får ta rad 1 bara när den faktiskt slår centrallagervägen.
   // - Annars → varan beställs till butik via centrallager. Texten hålls KONSTANT ("Beställs till
   //   <butik>" / "Beställs till butik", grön prick) så åtgärden är tydlig; väntan lever på rad 2.
   //   "Finns inte hos …" undviks – det läser ickekommersiellt fast varan går att få.
+  const useIncomingStores = noStoreSelected && !inOtherStores && incomingInOtherStores && onlineSlowOrGone;
   let storeRow: BoxRow;
   if (inStoreNow) {
     storeRow = { kind: "stock", text: `${storeStockCount} st i lager hos ${storeName}`, tone: "positive", action: storeAction };
   } else if (useStoreIncoming) {
     storeRow = { kind: "eta", text: `På väg till ${storeName}`, action: storeAction };
-  } else if (useStoreOrder) {
-    storeRow = { kind: "eta", text: `Beställningsvara hos ${storeName}`, action: storeAction };
   } else if (noStoreSelected && inOtherStores) {
     storeRow = { kind: "stock", text: `Finns i ${OTHER_STORES_COUNT} butiker`, tone: "positive", action: storeAction };
+  } else if (useIncomingStores) {
+    storeRow = { kind: "eta", text: `På väg in till ${INCOMING_STORES_COUNT} butiker`, action: storeAction };
   } else {
     storeRow = { kind: "stock", text: noStoreSelected ? "Beställs till butik" : `Beställs till ${storeName}`, tone: "positive", action: storeAction };
   }
@@ -681,10 +731,19 @@ export function getLagervaraBox(params: {
 
   // Utan vald butik kan vi inte ange hämt-/hemleveranstider (de är butiksberoende) → ersätt de
   // raderna med en info-box som uppmanar till butiksval. Saldoraderna (1–2) ligger kvar.
+  // Saknas centrallagervägen (enda spåret är enstaka butiker) är det inte tiderna som är okända
+  // utan om varan över huvud taget finns i just den butiken – då lovar vi inga tider, utan säger
+  // vad valet faktiskt svarar på. Frågan skiljer sig åt mellan de två spåren: restsaldo svarar
+  // "finns den kvar?", inleverans svarar "när kommer den?". Löftesnivån följer alltså vad vi vet,
+  // inte en fast textmall.
   if (noStoreSelected) {
-    return {
-      rows: [storeRow, onlineRow, { kind: "notice", text: "Välj butik för att se tider för hämtning och hemleverans." }],
-    };
+    let noticeText = "Välj butik för att se tider för hämtning och hemleverans.";
+    if (noCentralWarehousePath) {
+      noticeText = inOtherStores
+        ? "Välj butik för att se om varan finns kvar där."
+        : "Välj butik för att se när varan kommer dit.";
+    }
+    return { rows: [storeRow, onlineRow, { kind: "notice", text: noticeText }] };
   }
 
   // Rad 3 (hämta i butik) + rad 4 (hemleverans från butik). På hyllan → hämta 60 min, hemleverans
@@ -700,11 +759,8 @@ export function getLagervaraBox(params: {
     // ("från 15 maj"), hemleverans intervallet – precis som getStoreBox vid på väg in.
     pickupTiming = "från 15 maj";
     homeTiming = "inom 2–3 veckor";
-  } else if (useStoreOrder) {
-    // Butikens egen beställningsvara → 4–8 veckor på båda raderna.
-    pickupTiming = "inom 4–8 veckor";
-    homeTiming = "inom 4–8 veckor";
     // På väg in online = satt ankomstdatum (centrallager → butik), så hämtraden visar datumet.
+    // Beställningsläge online = CL:s leverantörsorder, 4–8 veckor på båda raderna.
   } else {
     pickupTiming =
       onlineState === "pa_vag_in" ? "från 15 maj" : onlineState === "bestallningslage" ? "inom 4–8 veckor" : "inom 3–5 dagar";

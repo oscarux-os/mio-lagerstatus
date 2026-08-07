@@ -17,6 +17,7 @@
   /* Info-meddelande (t.ex. "Välj butik för att se tider …") */
   --info-bg: #e9f1f9;
   --info-text: #15506b;
+  --info-icon: #1a6ea8;
 }
 
 @theme inline {
