@@ -6,10 +6,13 @@ import {
   getLagervaraBox,
   getOnlineBox,
   getStoreBox,
+  lagervaraStoreOptions,
   onlineOptions,
   storeOptions,
+  toLagervaraStoreState,
   STORES,
   STORE_NAME,
+  type LagervaraStoreState,
   type OnlineState,
   type ProductType,
   type StoreInfo,
@@ -29,10 +32,14 @@ export function LagerstatusSimulator() {
   const [type, setType] = useState<ProductType>("snabb");
   const [noStoreSelected, setNoStoreSelected] = useState(false);
   const [lagervaraInStores, setLagervaraInStores] = useState(false);
+  // Redan lagda inleveranser på väg in till enstaka butiker – skilt från hyllsaldot ovan. Enda
+  // spåret som räddar köpet när centrallagret är helt slut och inget står på någon hylla.
+  const [lagervaraIncomingInStores, setLagervaraIncomingInStores] = useState(false);
   const [storeState, setStoreState] = useState<StoreState>("i_lager");
-  // Lagervarans butiksruta har ett eget scenario (i lager / på väg in / beställningsläge / slut)
-  // via "Butik"-väljaren, skilt från online-/centrallagerstatusen i storeState.
-  const [lagervaraStoreState, setLagervaraStoreState] = useState<StoreState>("i_lager");
+  // Lagervarans butiksruta har ett eget scenario (i lager / på väg in / slut) via "Butik"-
+  // väljaren, skilt från online-/centrallagerstatusen i storeState. Beställningsläge saknas
+  // avsiktligt – det är centrallagrets kanal, se LagervaraStoreState.
+  const [lagervaraStoreState, setLagervaraStoreState] = useState<LagervaraStoreState>("i_lager");
   const [onlineState, setOnlineState] = useState<OnlineState>("i_lager_cl");
   // Vissa snabbrörliga produkter går inte att skicka till ombud alls, oavsett lagerstatus
   // (t.ex. skrymmande varor) – en egen switch skild från online-lagerstatusen.
@@ -61,6 +68,7 @@ export function LagerstatusSimulator() {
           storeShelfState: lagervaraStoreState,
           storeStockCount: lagervaraStoreCount,
           inOtherStores: lagervaraInStores,
+          incomingInOtherStores: lagervaraIncomingInStores,
         })
       : getStoreBox(storeState, noStoreSelected, selectedStore?.name ?? STORE_NAME, type, onlineState, lagervaraInStores, false, lagervaraStoreCount, lagervaraStoreState);
   // Lagervara har ingen separat online-ruta längre – online-saldot bor i den enade rutan ovan.
@@ -74,7 +82,11 @@ export function LagerstatusSimulator() {
     setOmbudAvailable(true);
     // Lagervara speglar den valda butikens egen status (så "i lager / beställs till", hämttid
     // och hemleverans stämmer med butiken). Finns en vald butik utgår vi från dess status.
-    setLagervaraStoreState(nextType === "lagervara" && selectedStore && !noStoreSelected ? selectedStore.state : "i_lager");
+    setLagervaraStoreState(
+      nextType === "lagervara" && selectedStore && !noStoreSelected
+        ? toLagervaraStoreState(selectedStore.state)
+        : "i_lager",
+    );
   }
 
   return (
@@ -116,10 +128,18 @@ export function LagerstatusSimulator() {
               valda butikens eget saldo och saknar mening utan vald butik → då disablad. */}
           <SelectField label={type === "lagervara" ? "Online" : "Butik"} value={storeState} disabled={noStoreSelected && type !== "lagervara"} options={storeOptions[type]} onChange={(v) => setStoreState(v as StoreState)} />
           {/* Lagervara: "Butik"-väljaren styr den valda butikens egen status (i lager / på väg in /
-              beställningsläge / slut). "Ej tillgänglig" = butiken för inte varan → tas dit via
-              centrallager. Disablad utan vald butik (då finns ingen butiksstatus att visa). */}
+              slut). "Ej tillgänglig" = butiken för inte varan → tas dit via centrallager. Inget
+              beställningsläge här: butiken har ingen egen leverantörsorder för en lagervara, så
+              det läget bor i "Online" ovan. Disablad utan vald butik (båda värdena som finns kvar
+              är butiksspecifika och har ingen mening då). */}
           {type === "lagervara" && (
-            <SelectField label="Butik" value={lagervaraStoreState} disabled={noStoreSelected} options={storeOptions.lagervara} onChange={(v) => setLagervaraStoreState(v as StoreState)} />
+            <SelectField
+              label="Butik"
+              value={lagervaraStoreState}
+              disabled={noStoreSelected}
+              options={lagervaraStoreOptions}
+              onChange={(v) => setLagervaraStoreState(v as LagervaraStoreState)}
+            />
           )}
         </div>
 
@@ -138,6 +158,15 @@ export function LagerstatusSimulator() {
               checked={lagervaraInStores}
               label="Finns i andra butiker"
               onChange={() => setLagervaraInStores(!lagervaraInStores)}
+            />
+          )}
+          {/* Inleveranser på väg in till enstaka butiker. Syns bara när centrallagervägen är
+              långsam eller slut – annars är den vägen både snabbare och säkrare att lova. */}
+          {type === "lagervara" && (
+            <CheckRow
+              checked={lagervaraIncomingInStores}
+              label="På väg in till andra butiker"
+              onChange={() => setLagervaraIncomingInStores(!lagervaraIncomingInStores)}
             />
           )}
         </div>
@@ -182,7 +211,9 @@ export function LagerstatusSimulator() {
             // Lagervara: byt upphämtningsbutik → spegla butikens egen status så att hela rutan
             // (i lager / beställs till, hämttid, hemleverans) stämmer skarpt med vald butik.
             // Centrallagrets (online) status ligger kvar och styrs separat av "Online"-väljaren.
-            setLagervaraStoreState(store.state);
+            // Butiker i beställningsläge blir "ej tillgänglig" här – för en lagervara betyder
+            // det att butiken inte för varan själv, den tas dit via centrallagret.
+            setLagervaraStoreState(toLagervaraStoreState(store.state));
           } else {
             // Snabb/möbler: butikens eget saldo ÄR rutan, så storeState följer valet.
             setStoreState(store.state);
