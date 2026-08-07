@@ -24,6 +24,14 @@ export function toLagervaraStoreState(state: StoreState): LagervaraStoreState {
   return state === "bestallningslage" ? "ej_tillganglig" : state;
 }
 
+// Centrallagrets saldo i prototypen (mock).
+const CENTRAL_STOCK = "100+ st";
+
+// Under så här många exemplar räknas butikens saldo som knappt. Då – och bara då – visar vi att
+// fler går att beställa: den som vill ha två men bara ser ett exemplar lämnar annars produkten.
+// 4 och uppåt täcker de flesta köp, och där är en andra saldorad bara brus.
+const LOW_STORE_STOCK = 4;
+
 export type Option<T extends string> = {
   id: T;
   label: string;
@@ -642,6 +650,8 @@ export function getLagervaraBox(params: {
   incomingInOtherStores: boolean;
 }): BoxContent {
   const { noStoreSelected, storeName, onlineState, storeShelfState, storeStockCount, inOtherStores, incomingInOtherStores } = params;
+  // Mottagaren för "beställs till …" – butiksnamnet när ett val finns, annars generiskt.
+  const orderTarget = noStoreSelected ? "butik" : storeName;
 
   // Hämta-direkt-länken i foten pekar på ANDRA butiker än den valda – meningslös utan vald
   // butik (då bär rad 1 + "Välj butik" den rollen i stället).
@@ -703,6 +713,9 @@ export function getLagervaraBox(params: {
   //   <butik>" / "Beställs till butik", grön prick) så åtgärden är tydlig; väntan lever på rad 2.
   //   "Finns inte hos …" undviks – det läser ickekommersiellt fast varan går att få.
   const useIncomingStores = noStoreSelected && !inOtherStores && incomingInOtherStores && onlineSlowOrGone;
+  // Sant när rad 1 bär centrallagrets besked i stället för ett butiksspecifikt – då ska rad 2
+  // inte upprepa samma sak.
+  let storeRowIsCentral = false;
   let storeRow: BoxRow;
   if (inStoreNow) {
     storeRow = { kind: "stock", text: `${storeStockCount} st i lager hos ${storeName}`, tone: "positive", action: storeAction };
@@ -713,20 +726,49 @@ export function getLagervaraBox(params: {
   } else if (useIncomingStores) {
     storeRow = { kind: "eta", text: `På väg in till ${INCOMING_STORES_COUNT} butiker`, action: storeAction };
   } else {
-    storeRow = { kind: "stock", text: noStoreSelected ? "Beställs till butik" : `Beställs till ${storeName}`, tone: "positive", action: storeAction };
+    // Rad 1 ÄR centrallagerbeskedet här, och bär då både antalet och åtgärden i en mening:
+    // "100+ st går att beställa till Mio X". Verbet svarar på att varan inte står på hyllan utan
+    // att låta negativt (man beställer inte det som redan finns där), och antalet blir trygghet
+    // i stället för falsk närvaro. Antalet finns bara att visa när centrallagret har saldo – på
+    // väg in / beställningsläge saknar antal och lägger i stället väntan i hämtraden.
+    storeRowIsCentral = true;
+    const text =
+      onlineState === "i_lager"
+        ? `${CENTRAL_STOCK} går att beställa till ${orderTarget}`
+        : `Beställs till ${orderTarget}`;
+    storeRow = { kind: "stock", text, tone: "positive", action: storeAction };
   }
 
-  // Rad 2 – online/centrallager. Wording speglar getOnlineBox: i lager = prick-saldo, på väg in /
-  // beställningsläge = klock-rad ("På väg in online" / "Beställningsvara online"), slut = dämpat.
-  let onlineRow: BoxRow;
-  if (onlineState === "i_lager") {
-    onlineRow = { kind: "stock", text: "Online: 100+ st i lager", tone: "positive" };
+  // Rad 2 – centrallagret. Svarar på "kan den beställas hit?" i stället för att rapportera en
+  // kanal: ordet "Online" återinförde precis den kanaluppdelning som den enade rutan skulle ta
+  // bort (en lagervara har ingen onlinekanal – allt går via butik), och "Online: 100+ st i lager"
+  // bredvid "Beställs till Mio X" gav två gröna prickar där saldot vann över verbet i en
+  // skumläsning. Det var därför kunder inte kunde avgöra om varan fanns i butiken.
+  // Raden visas bara när den säger något rad 1 inte redan säger. Är rad 1 redan centrallager-
+  // beskedet vore den en upprepning. Och står varan på hyllan i tillräckligt antal är kundens
+  // fråga besvarad – då blir en andra saldorad bara en grön prick till att snubbla på, vilket
+  // var precis mönstret som gjorde att kunder inte kunde avgöra om varan fanns i butiken.
+  // Är saldot knappt räddar raden i stället köpet, så den visas då (se LOW_STORE_STOCK).
+  const storeStockCovers = inStoreNow && storeStockCount >= LOW_STORE_STOCK;
+  // Har den valda butiken en egen väg – varan står på hyllan, eller en inleverans är på väg dit –
+  // utelämnas det NEGATIVA beskedet helt. Att varan inte går att beställa är då ett nedslående
+  // besked utan åtgärd: kunden kan ju hämta den. De positiva beskeden ("går att beställa …")
+  // står kvar, för de erbjuder en väg till fler exemplar. Utan vald butik står även det negativa
+  // kvar – där förklarar det varför enstaka butiker är enda vägen.
+  const storeHasOwnPath = inStoreNow || useStoreIncoming;
+  let onlineRow: BoxRow | null;
+  if (storeRowIsCentral || storeStockCovers) {
+    onlineRow = null;
+  } else if (onlineState === "ej_tillganglig" && storeHasOwnPath) {
+    onlineRow = null;
+  } else if (onlineState === "i_lager") {
+    onlineRow = { kind: "stock", text: `${CENTRAL_STOCK} går att beställa till butik`, tone: "positive" };
   } else if (onlineState === "pa_vag_in") {
-    onlineRow = { kind: "eta", text: "På väg in online" };
+    onlineRow = { kind: "eta", text: "Går att beställa till butik från 15 maj" };
   } else if (onlineState === "bestallningslage") {
-    onlineRow = { kind: "eta", text: "Beställningsvara online" };
+    onlineRow = { kind: "eta", text: "Går att beställa till butik, 4–8 veckor" };
   } else {
-    onlineRow = { kind: "stock", text: "Slutsåld online", tone: "muted" };
+    onlineRow = { kind: "stock", text: "Går inte att beställa till butik", tone: "muted" };
   }
 
   // Utan vald butik kan vi inte ange hämt-/hemleveranstider (de är butiksberoende) → ersätt de
@@ -743,7 +785,7 @@ export function getLagervaraBox(params: {
         ? "Välj butik för att se om varan finns kvar där."
         : "Välj butik för att se när varan kommer dit.";
     }
-    return { rows: [storeRow, onlineRow, { kind: "notice", text: noticeText }] };
+    return { rows: [storeRow, ...(onlineRow ? [onlineRow] : []), { kind: "notice", text: noticeText }] };
   }
 
   // Rad 3 (hämta i butik) + rad 4 (hemleverans från butik). På hyllan → hämta 60 min, hemleverans
@@ -770,7 +812,7 @@ export function getLagervaraBox(params: {
   const pickupRow: BoxRow = { kind: "delivery", icon: "store", text: `Hämta gratis i butik ${pickupTiming}` };
   const homeRow: BoxRow = { kind: "delivery", icon: "truck", text: `Hemleverans från butik ${homeTiming}` };
 
-  return { rows: [storeRow, onlineRow, pickupRow, homeRow], footerLink: otherStoresLink };
+  return { rows: [storeRow, ...(onlineRow ? [onlineRow] : []), pickupRow, homeRow], footerLink: otherStoresLink };
 }
 
 export function getCardStatus(
