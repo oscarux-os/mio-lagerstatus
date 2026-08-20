@@ -35,8 +35,6 @@ export function LagerstatusSimulator() {
   // Redan lagda inleveranser på väg in till enstaka butiker – skilt från hyllsaldot ovan. Enda
   // spåret som räddar köpet när centrallagret är helt slut och inget står på någon hylla.
   const [lagervaraIncomingInStores, setLagervaraIncomingInStores] = useState(false);
-  // Knappt saldo i vald butik (2 st) – under tröskeln där rutan visar att fler går att beställa.
-  const [lagervaraLowStock, setLagervaraLowStock] = useState(false);
   const [storeState, setStoreState] = useState<StoreState>("i_lager");
   // Lagervarans butiksruta har ett eget scenario (i lager / på väg in / slut) via "Butik"-
   // väljaren, skilt från online-/centrallagerstatusen i storeState. Beställningsläge saknas
@@ -57,9 +55,7 @@ export function LagerstatusSimulator() {
 
   // Butiksprimär lagervara visar den valda butikens eget saldo. Mock-butiker som inte är "i lager"
   // har 0 i saldo – då "finns i vald butik" är ett manuellt override-läge faller vi tillbaka på 4.
-  // Lågt saldo är en egen kontext eftersom butikssaldot annars beror på vilken butik som råkar
-  // vara vald (mock-butikerna ligger på 1–11), och tröskelregeln är svår att träffa av en slump.
-  const lagervaraStoreCount = lagervaraLowStock ? 2 : selectedStore?.stockCount || 4;
+  const lagervaraStoreCount = selectedStore?.stockCount || 4;
   // Lagervara: en enad ruta med fasta rader (butik · online · hämta · hemleverans) i stället för
   // den kanaluppdelade butiks-/online-rutan. "storeState" är här centrallagrets (online) status,
   // och "Butik"-väljaren (lagervaraStoreState) styr den valda butikens egen status.
@@ -171,15 +167,6 @@ export function LagerstatusSimulator() {
               checked={lagervaraIncomingInStores}
               label="På väg in till andra butiker"
               onChange={() => setLagervaraIncomingInStores(!lagervaraIncomingInStores)}
-            />
-          )}
-          {/* Sätter butikssaldot till 2 st, dvs under tröskeln (3 st eller färre) där rutan visar
-              att fler går att beställa. Kräver att Butik står på "I lager". */}
-          {type === "lagervara" && (
-            <CheckRow
-              checked={lagervaraLowStock}
-              label="Lågt saldo i butik (2 st)"
-              onChange={() => setLagervaraLowStock(!lagervaraLowStock)}
             />
           )}
         </div>

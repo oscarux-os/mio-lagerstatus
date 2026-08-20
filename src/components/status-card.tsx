@@ -57,18 +57,25 @@ function iconForSlot(slot: "store" | "truck" | "package") {
   return <TruckIcon />;
 }
 
+// Bara "muted" tonar ner texten – guldpricken sitter i vanlig textfärg, se BoxRow.tone.
+const DOT_COLOR: Record<"positive" | "warning" | "muted", string> = {
+  positive: "var(--success)",
+  warning: "var(--dot-warning)",
+  muted: "var(--dot-muted)",
+};
+
 function StockRow({ row, onAction }: { row: Extract<BoxRow, { kind: "stock" }>; onAction?: () => void }) {
   return (
     <div className="flex items-center gap-1.5 w-full">
       <div className="flex items-center shrink-0 w-4 h-5">
         <span
           className="rounded-full size-2.5"
-          style={{ background: row.tone === "positive" ? "var(--success)" : "var(--dot-muted)" }}
+          style={{ background: DOT_COLOR[row.tone] }}
         />
       </div>
       <p
         className="flex-1 min-w-0 text-base leading-6 tracking-[-0.2px]"
-        style={{ color: row.tone === "positive" ? "var(--text)" : "var(--muted-foreground)" }}
+        style={{ color: row.tone === "muted" ? "var(--muted-foreground)" : "var(--text)" }}
       >
         {row.text}
       </p>

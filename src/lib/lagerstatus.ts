@@ -24,13 +24,9 @@ export function toLagervaraStoreState(state: StoreState): LagervaraStoreState {
   return state === "bestallningslage" ? "ej_tillganglig" : state;
 }
 
-// Centrallagrets saldo i prototypen (mock).
+// Centrallagrets saldo i prototypen (mock). Visas bara när varan är slut i den valda butiken –
+// se rad 2 i getLagervaraBox.
 const CENTRAL_STOCK = "100+ st";
-
-// Under så här många exemplar räknas butikens saldo som knappt. Då – och bara då – visar vi att
-// fler går att beställa: den som vill ha två men bara ser ett exemplar lämnar annars produkten.
-// 4 och uppåt täcker de flesta köp, och där är en andra saldorad bara brus.
-const LOW_STORE_STOCK = 4;
 
 export type Option<T extends string> = {
   id: T;
@@ -41,7 +37,11 @@ export type BoxRow =
   | {
       kind: "stock";
       text: string;
-      tone: "positive" | "muted";
+      // positive = grön prick, finns på hyllan att hämta nu.
+      // warning  = guldprick i vanlig textfärg: varan är inte här just nu men läget går över, och
+      //            raden bär ett besked kunden ska läsa (inte tona bort) – "Tillfälligt slut hos X".
+      // muted    = nedtonad prick och nedtonad text, för det som faktiskt är ett nej utan åtgärd.
+      tone: "positive" | "warning" | "muted";
       action?: string;
     }
   | {
@@ -630,7 +630,8 @@ export function getLagervaraOnlineBox(
 // innehåll byts mellan tillstånd – inga rader tillkommer eller faller bort, så
 // layouten står still (ingen "hoppighet" beroende på butiksval). Raderna:
 //   1. butiksstatus · 2. onlinestatus · 3. hämta i butik · 4. hemleverans från butik
-// Rad 1–2 visar "i lager" som grön prick och på väg in / beställningsläge som klock-rad,
+// Rad 1–2 visar "i lager" (finns på hyllan att hämta) som grön prick, och allt som ännu inte är
+// på plats – på väg in, beställningsläge, beställs till butik via centrallager – som klock-rad,
 // med samma wording som de andra rutorna (getStoreBox / getOnlineBox).
 export function getLagervaraBox(params: {
   noStoreSelected: boolean;
@@ -709,13 +710,20 @@ export function getLagervaraBox(params: {
   // - Ingen butik vald, inget hyllsaldo men inleveranser på väg och en långsam/slut onlineväg →
   //   "På väg in till N butiker" (klocka). Samma regel som useStoreIncoming, fast aggregerad:
   //   butikernas egen inleverans får ta rad 1 bara när den faktiskt slår centrallagervägen.
-  // - Annars → varan beställs till butik via centrallager. Texten hålls KONSTANT ("Beställs till
-  //   <butik>" / "Beställs till butik", grön prick) så åtgärden är tydlig; väntan lever på rad 2.
-  //   "Finns inte hos …" undviks – det läser ickekommersiellt fast varan går att få.
+  // - Vald butik utan hyllsaldo → "Tillfälligt slut hos <butik>" (nedtonad prick). Butiksraden
+  //   säger det butiksspecifika, som den ska, och rad 2 bär beställningsvägen med centrallagrets
+  //   antal. "Tillfälligt" är nyckeln: det är ett läge som går över, inte ett nej – och det tar
+  //   bort tvetydigheten som fanns när rutan bara sa att varan gick att beställa hit (stod den
+  //   på hyllan också?). "Finns inte hos …" undviks fortfarande, det läser som ett nej.
+  // - Utan vald butik → centrallagerbeskedet, KONSTANT ("Går att beställa till butik", klocka).
+  //   Inget antal här: utan butik finns inget "slut hos X" att kontrastera det mot.
   const useIncomingStores = noStoreSelected && !inOtherStores && incomingInOtherStores && onlineSlowOrGone;
   // Sant när rad 1 bär centrallagrets besked i stället för ett butiksspecifikt – då ska rad 2
   // inte upprepa samma sak.
   let storeRowIsCentral = false;
+  // Sant när rad 1 säger att varan är slut i den valda butiken – då är rad 2 svaret på det, och
+  // bara då bär den centrallagrets antal.
+  let storeSoldOut = false;
   let storeRow: BoxRow;
   if (inStoreNow) {
     storeRow = { kind: "stock", text: `${storeStockCount} st i lager hos ${storeName}`, tone: "positive", action: storeAction };
@@ -725,44 +733,66 @@ export function getLagervaraBox(params: {
     storeRow = { kind: "stock", text: `Finns i ${OTHER_STORES_COUNT} butiker`, tone: "positive", action: storeAction };
   } else if (useIncomingStores) {
     storeRow = { kind: "eta", text: `På väg in till ${INCOMING_STORES_COUNT} butiker`, action: storeAction };
+  } else if (!noStoreSelected) {
+    // Varan är slut i den valda butiken. Det beskedet får rad 1 – guldprick i vanlig textfärg, inte
+    // nedtonat: raden är själva svaret på "finns den i min butik?" och ska läsas, inte tonas bort.
+    // Nedtoning är reserverad för det som är ett nej utan åtgärd ("Går inte att beställa till
+    // butik"); här går varan att få, den står bara inte på hyllan i dag.
+    // Centrallagret tar rad 2 i stället för att trängas här. Den som ändå
+    // vill hämta samma dag har "Byt butik" på raden och "Hämta direkt i N andra butiker" i foten.
+    storeSoldOut = true;
+    storeRow = { kind: "stock", text: `Tillfälligt slut hos ${storeName}`, tone: "warning", action: storeAction };
   } else {
-    // Rad 1 ÄR centrallagerbeskedet här, och bär då både antalet och åtgärden i en mening:
-    // "100+ st går att beställa till Mio X". Verbet svarar på att varan inte står på hyllan utan
-    // att låta negativt (man beställer inte det som redan finns där), och antalet blir trygghet
-    // i stället för falsk närvaro. Antalet finns bara att visa när centrallagret har saldo – på
-    // väg in / beställningsläge saknar antal och lägger i stället väntan i hämtraden.
+    // Ingen butik vald → rad 1 ÄR centrallagerbeskedet: "Går att beställa till butik". KONSTANT
+    // över centrallagrets alla lägen; väntan bor i klockan och i hämt-/hemleveransraderna, där
+    // den ändå måste tidsättas.
+    // Inget antal här. Antalet är trygghet EFTER ett negativt besked ("tillfälligt slut hos Mio X
+    // – men 100+ st går att beställa hit"), och utan vald butik finns inget sådant besked att
+    // trösta. Kvar blir bara en lång rad med ett tresiffrigt lagersaldo som läses som butikens.
+    // "Går att beställa" hellre än "Beställs till": med klocka framför läser "Beställs till Mio X"
+    // som att en order redan är lagd (jfr "På väg till Mio X"). Verbformen säger att det är
+    // kunden som kan göra det, och delar vokabulär med rad 2.
+    // Ikonen är en KLOCKA, inte en grön prick: varan står inte i butiken nu, den tas dit – samma
+    // "kommer, men inte än"-läge som när en vara är på väg in till en butik, och därför samma
+    // ikon. Den gröna pricken är reserverad för det som faktiskt finns på hyllan att hämta;
+    // användes den även här läste kunden beställningsläget som närvaro i butiken.
     storeRowIsCentral = true;
-    const text =
-      onlineState === "i_lager"
-        ? `${CENTRAL_STOCK} går att beställa till ${orderTarget}`
-        : `Beställs till ${orderTarget}`;
-    storeRow = { kind: "stock", text, tone: "positive", action: storeAction };
+    storeRow = { kind: "eta", text: `Går att beställa till ${orderTarget}`, action: storeAction };
   }
 
   // Rad 2 – centrallagret. Svarar på "kan den beställas hit?" i stället för att rapportera en
   // kanal: ordet "Online" återinförde precis den kanaluppdelning som den enade rutan skulle ta
   // bort (en lagervara har ingen onlinekanal – allt går via butik), och "Online: 100+ st i lager"
-  // bredvid "Beställs till Mio X" gav två gröna prickar där saldot vann över verbet i en
+  // bredvid beställningsraden gav två gröna prickar där saldot vann över verbet i en
   // skumläsning. Det var därför kunder inte kunde avgöra om varan fanns i butiken.
   // Raden visas bara när den säger något rad 1 inte redan säger. Är rad 1 redan centrallager-
-  // beskedet vore den en upprepning. Och står varan på hyllan i tillräckligt antal är kundens
-  // fråga besvarad – då blir en andra saldorad bara en grön prick till att snubbla på, vilket
-  // var precis mönstret som gjorde att kunder inte kunde avgöra om varan fanns i butiken.
-  // Är saldot knappt räddar raden i stället köpet, så den visas då (se LOW_STORE_STOCK).
-  const storeStockCovers = inStoreNow && storeStockCount >= LOW_STORE_STOCK;
+  // beskedet vore den en upprepning. Och står varan på hyllan är kundens fråga besvarad – då blir
+  // en andra rad bara något att snubbla på, vilket var precis mönstret som gjorde att kunder inte
+  // kunde avgöra om varan fanns i butiken. Antalet på hyllan spelar ingen roll för den
+  // bedömningen: en tröskel som visade "fler går att beställa" vid knappt saldo lade tillbaka en
+  // andra rad i det läge där rad 1 redan var som starkast, och gjorde rutan olika hög beroende på
+  // vilken butik som råkade vara vald.
   // Har den valda butiken en egen väg – varan står på hyllan, eller en inleverans är på väg dit –
   // utelämnas det NEGATIVA beskedet helt. Att varan inte går att beställa är då ett nedslående
   // besked utan åtgärd: kunden kan ju hämta den. De positiva beskeden ("går att beställa …")
-  // står kvar, för de erbjuder en väg till fler exemplar. Utan vald butik står även det negativa
+  // står kvar, för de erbjuder en väg till varan. Utan vald butik står även det negativa
   // kvar – där förklarar det varför enstaka butiker är enda vägen.
   const storeHasOwnPath = inStoreNow || useStoreIncoming;
   let onlineRow: BoxRow | null;
-  if (storeRowIsCentral || storeStockCovers) {
+  if (storeRowIsCentral || inStoreNow) {
     onlineRow = null;
   } else if (onlineState === "ej_tillganglig" && storeHasOwnPath) {
     onlineRow = null;
   } else if (onlineState === "i_lager") {
-    onlineRow = { kind: "stock", text: `${CENTRAL_STOCK} går att beställa till butik`, tone: "positive" };
+    // Klocka, inte grön prick: det här är beställningsvägen, inte hyllsaldo.
+    // Antalet visas bara när rad 1 sa att varan är slut i den valda butiken. Där är det trygghet
+    // som besvarar ett nej: "tillfälligt slut hos Mio X" följt av "100+ st går att beställa till
+    // butik" säger att väntan handlar om transport, inte om att varan kan tas ifrån en. Utan ett
+    // sådant nej framför sig är antalet bara ett tresiffrigt lagersaldo som läses som butikens.
+    onlineRow = {
+      kind: "eta",
+      text: storeSoldOut ? `${CENTRAL_STOCK} går att beställa till butik` : "Går att beställa till butik",
+    };
   } else if (onlineState === "pa_vag_in") {
     onlineRow = { kind: "eta", text: "Går att beställa till butik från 15 maj" };
   } else if (onlineState === "bestallningslage") {
