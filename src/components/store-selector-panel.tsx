@@ -13,7 +13,7 @@ function StatusDot({ tone }: { tone: StoreListItem["status"]["tone"] }) {
     );
   }
   const color =
-    tone === "green" ? "var(--success)" : tone === "amber" ? "#b8860b" : "var(--dot-muted)";
+    tone === "green" ? "var(--success)" : tone === "amber" ? "var(--dot-warning)" : "var(--dot-muted)";
   return (
     <span className="flex items-center justify-center shrink-0 w-4 h-4">
       <span className="size-2.5 rounded-full" style={{ background: color }} />

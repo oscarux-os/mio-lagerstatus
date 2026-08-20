@@ -13,6 +13,8 @@
   --border-subtle: #cecece;
   --text: #000000;
   --dot-muted: #c7c7c2;
+  /* Guldprick: läget är inte negativt, bara inte just nu – t.ex. "Tillfälligt slut hos <butik>". */
+  --dot-warning: #b8860b;
 
   /* Info-meddelande (t.ex. "Välj butik för att se tider …") */
   --info-bg: #e9f1f9;
