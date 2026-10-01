@@ -10,6 +10,7 @@ import {
   onlineOptions,
   storeOptions,
   toLagervaraStoreState,
+  OTHER_STORES_COUNT,
   STORES,
   STORE_NAME,
   type LagervaraStoreState,
@@ -22,10 +23,22 @@ import {
 // Default-butik för prototypen så rutan har ett konkret butiksnamn innan användaren
 // öppnat butiksväljaren. Speglas sedan av det faktiska valet via onSelect.
 const DEFAULT_STORE = STORES.find((store) => store.id === "kungens-kurva");
+import {
+  getV2Status,
+  storesWithStockCount,
+  toV2StoreState,
+  v2OnlineOptions,
+  v2ProductOptions,
+  v2StoreOptions,
+  type V2OnlineState,
+  type V2ProductType,
+  type V2StoreState,
+} from "@/lib/lagerstatus-v2";
 import { ClockIcon, LagerstatusBoxes } from "./status-card";
+import { StatusV2, SourceNote } from "./status-v2";
 import { StoreSelectorPanel } from "./store-selector-panel";
 
-type Tab = "produktsida" | "produktkort";
+type Tab = "produktsida" | "produktsida-v2" | "produktkort";
 
 export function LagerstatusSimulator() {
   const [tab, setTab] = useState<Tab>("produktsida");
@@ -46,6 +59,21 @@ export function LagerstatusSimulator() {
   const [ombudAvailable, setOmbudAvailable] = useState(true);
   const [panelOpen, setPanelOpen] = useState(false);
   const [selectedStore, setSelectedStore] = useState<StoreInfo | undefined>(DEFAULT_STORE);
+
+  // --- v2: "en plats och ett löfte" ----------------------------------------
+  // Egen uppsättning state så v1 kan stå kvar orörd bredvid och ställas mot den.
+  const [v2Type, setV2Type] = useState<V2ProductType>("mobler");
+  const [v2StoreState, setV2StoreState] = useState<V2StoreState>("i_lager");
+  const [v2OnlineState, setV2OnlineState] = useState<V2OnlineState>("i_lager");
+  const [v2StoreSelected, setV2StoreSelected] = useState(true);
+  // En enda växel: går varan att leverera eller inte. Hem kontra ombud är ett kassabeslut
+  // och syns därför inte i statusen.
+  const [v2Deliverable, setV2Deliverable] = useState(true);
+  // Andra butiker med varan på hyllan just nu – egen växel, det följer inte av den valda
+  // butikens läge.
+  const [v2OtherStores, setV2OtherStores] = useState(true);
+  const [v2Postcode, setV2Postcode] = useState<string | null>(null);
+  const [v2Store, setV2Store] = useState<StoreInfo | undefined>(DEFAULT_STORE);
 
   const onlineSelectOptions = onlineOptions[type];
 
@@ -75,6 +103,22 @@ export function LagerstatusSimulator() {
   const onlineBox = type === "lagervara" ? null : getOnlineBox(onlineState, type, noStoreSelected, ombudAvailable);
   const cardStatus = getCardStatus(storeState, onlineState, noStoreSelected, type);
 
+  const isV2 = tab === "produktsida-v2";
+  const v2Result = getV2Status({
+    productType: v2Type,
+    storeState: v2StoreState,
+    onlineState: v2OnlineState,
+    storeSelected: v2StoreSelected,
+    storeName: v2Store?.name ?? STORE_NAME,
+    storesWithStock: storesWithStockCount,
+    otherStoresWithStock: v2OtherStores ? OTHER_STORES_COUNT : 0,
+    // Mock-butiker utan saldo har 0 – då faller raden tillbaka på "I lager hos {butik}".
+    storeStockCount: v2Store?.stockCount || 4,
+    postcode: v2Postcode,
+    // Outlet är butiksexklusiv – då finns ingen leveransväg alls.
+    deliverable: v2Type === "outlet" ? false : v2Deliverable,
+  });
+
   function onTypeChange(nextType: ProductType) {
     setType(nextType);
     setStoreState("i_lager");
@@ -93,6 +137,26 @@ export function LagerstatusSimulator() {
     <div className="min-h-screen flex flex-col lg:flex-row bg-background">
       <aside className="order-last lg:order-first lg:w-72 lg:shrink-0 lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto bg-white border-t lg:border-t-0 lg:border-r border-[#e0ddd7] p-6 flex flex-col gap-6">
         <div className="h-px bg-[#ebebeb]" />
+
+        {isV2 ? (
+          <V2Controls
+            type={v2Type}
+            storeState={v2StoreState}
+            onlineState={v2OnlineState}
+            storeSelected={v2StoreSelected}
+            deliverable={v2Deliverable}
+            otherStores={v2OtherStores}
+            postcode={v2Postcode}
+            onType={setV2Type}
+            onStoreState={setV2StoreState}
+            onOnlineState={setV2OnlineState}
+            onStoreSelected={setV2StoreSelected}
+            onDeliverable={setV2Deliverable}
+            onOtherStores={setV2OtherStores}
+            onPostcode={setV2Postcode}
+          />
+        ) : (
+        <>
 
         <fieldset className="flex flex-col gap-2">
           <legend className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#999] mb-2">
@@ -170,17 +234,41 @@ export function LagerstatusSimulator() {
             />
           )}
         </div>
+        </>
+        )}
       </aside>
 
       <main className="flex-1 p-6 lg:p-10">
         <div className="flex gap-0 border-b border-[#e0ddd7] mb-6">
           <TabBtn active={tab === "produktsida"} onClick={() => setTab("produktsida")}>Produktsida</TabBtn>
+          <TabBtn active={tab === "produktsida-v2"} onClick={() => setTab("produktsida-v2")}>Produktsida v2</TabBtn>
           <TabBtn active={tab === "produktkort"} onClick={() => setTab("produktkort")} disabled>Produktkort</TabBtn>
         </div>
 
         {tab === "produktsida" ? (
           <div className="max-w-sm">
             <LagerstatusBoxes storeContent={storeBox} onlineContent={onlineBox} onStoreAction={() => setPanelOpen(true)} />
+          </div>
+        ) : isV2 ? (
+          <div className="max-w-md">
+            <StatusV2
+              result={v2Result}
+              postcode={v2Postcode}
+              onOpenStores={() => setPanelOpen(true)}
+              onSetPostcode={(value) => {
+                setV2Postcode(value);
+                // Postnumret är kundens enda inmatning i v2 – när det kommer in finns inget skäl
+                // att fortsätta visa butiksraden utan butik, så vi låser upp butikskontexten med.
+                setV2StoreSelected(true);
+              }}
+            />
+            <SourceNote source={v2Result.source} />
+            <p className="mt-6 text-xs leading-5 text-[#8a8a85] max-w-sm">
+              Två rader: en plats och ett löfte. Inga antal, inga fraktpriser, ingen
+              onlinelager-status — ordet &quot;online&quot; läses av kunden som kanalen hen står
+              i, inte som ett lager, och ett nej där stoppar köp som faktiskt går att göra.
+              Leveransraden finns alltid och säger ett datum, oavsett vilken källa som försörjer.
+            </p>
           </div>
         ) : (
           <div>
@@ -206,6 +294,13 @@ export function LagerstatusSimulator() {
         selectedStoreId={selectedStore?.id}
         onClose={() => setPanelOpen(false)}
         onSelect={(store) => {
+          if (isV2) {
+            setV2Store(store);
+            setV2StoreState(toV2StoreState(store.state));
+            setV2StoreSelected(true);
+            setPanelOpen(false);
+            return;
+          }
           setSelectedStore(store);
           if (type === "lagervara") {
             // Lagervara: byt upphämtningsbutik → spegla butikens egen status så att hela rutan
@@ -322,5 +417,113 @@ function CardStatusBadge({ tone, label }: { tone: "green" | "amber" | "neutral" 
       <span style={{ color: "var(--success)" }}><ClockIcon size={12} /></span>
       <span className="text-xs text-[#111]">{label}</span>
     </div>
+  );
+}
+
+// Kontrollerna för v2. Egen uppsättning eftersom modellen har andra dimensioner än v1:
+// butikens läge och centrallagrets läge är skilda åt, och "försörjs bara via butik" är en
+// egen växel i stället för en flagga som döljer en hel ruta.
+function V2Controls({
+  type,
+  storeState,
+  onlineState,
+  storeSelected,
+  deliverable,
+  otherStores,
+  postcode,
+  onType,
+  onStoreState,
+  onOnlineState,
+  onStoreSelected,
+  onDeliverable,
+  onOtherStores,
+  onPostcode,
+}: {
+  type: V2ProductType;
+  storeState: V2StoreState;
+  onlineState: V2OnlineState;
+  storeSelected: boolean;
+  deliverable: boolean;
+  otherStores: boolean;
+  postcode: string | null;
+  onType: (v: V2ProductType) => void;
+  onStoreState: (v: V2StoreState) => void;
+  onOnlineState: (v: V2OnlineState) => void;
+  onStoreSelected: (v: boolean) => void;
+  onDeliverable: (v: boolean) => void;
+  onOtherStores: (v: boolean) => void;
+  onPostcode: (v: string | null) => void;
+}) {
+  const isOutlet = type === "outlet";
+
+  return (
+    <>
+      <fieldset className="flex flex-col gap-2">
+        <legend className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#999] mb-2">
+          Produkttyp
+        </legend>
+        {v2ProductOptions.map((option) => (
+          <RadioPill
+            key={option.id}
+            checked={type === option.id}
+            label={option.label}
+            onChange={() => onType(option.id)}
+          />
+        ))}
+      </fieldset>
+
+      <div className="h-px bg-[#ebebeb]" />
+
+      <div className="flex flex-col gap-4">
+        <SelectField
+          label="Butik"
+          value={storeState}
+          disabled={false}
+          options={v2StoreOptions}
+          onChange={(v) => onStoreState(v as V2StoreState)}
+        />
+        {/* Centrallagrets läge syns aldrig i kundtext – det påverkar bara vilket datum
+            leveransraden landar på. Därav etiketten. */}
+        <div className={isOutlet ? "opacity-40 pointer-events-none" : ""}>
+          <SelectField
+            label="Online (internt)"
+            value={onlineState}
+            disabled={isOutlet}
+            options={v2OnlineOptions}
+            onChange={(v) => onOnlineState(v as V2OnlineState)}
+          />
+        </div>
+      </div>
+
+      <div className="h-px bg-[#ebebeb]" />
+
+      <div className="flex flex-col gap-3">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#999]">Kontext</p>
+        <CheckRow
+          checked={!storeSelected}
+          label="Ingen butik vald"
+          onChange={() => onStoreSelected(!storeSelected)}
+        />
+        <CheckRow
+          checked={postcode !== null}
+          label="Postnummer angivet"
+          onChange={() => onPostcode(postcode === null ? "169 70" : null)}
+        />
+        <CheckRow
+          checked={deliverable}
+          label="Går att leverera"
+          onChange={() => onDeliverable(!deliverable)}
+        />
+        <CheckRow
+          checked={otherStores}
+          label="Finns nu i andra butiker"
+          onChange={() => onOtherStores(!otherStores)}
+        />
+        <p className="text-xs leading-5 text-[#8a8a85] mt-1">
+          Postnummer som börjar på 98 ligger utanför hemleveransområdet — skriv t.ex. 981 99 i
+          fältet för att se det beskedet.
+        </p>
+      </div>
+    </>
   );
 }
