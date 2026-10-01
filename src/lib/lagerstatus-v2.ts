@@ -167,10 +167,16 @@ export const storesWithStockCount = STORES.filter((store) => store.state === "i_
 
 // --- Rad 1: butik -----------------------------------------------------------
 //
-// En enda formulering – "I lager hos {butik}" – med en tidsangivelse som varierar: ingen alls
-// när varan står på hyllan, "från {datum}" när en inleverans är lagd, "inom {spann}" när den
-// beställs dit. Lagerläget i sig (på väg in, beställningsläge) nämns aldrig; det är systemets
-// kategori och säger inte vad kunden får.
+// En enda formulering med en tidsangivelse som varierar: inget tillägg när varan står på
+// hyllan, "från {datum}" när en inleverans är lagd, "om {spann}" när den beställs dit.
+// Lagerläget i sig (på väg in, beställningsläge) nämns aldrig; det är systemets kategori och
+// säger inte vad kunden får.
+//
+// De väntande lägena inleds med "Åter" i stället för att bara få ett tillägg på slutet. Utan
+// det ordet står "I lager hos {butik}" först i meningen och det som vänder betydelsen sist –
+// en skummande läsare har bestämt sig innan hen når dit, och klockan ensam är för svag för
+// att väga upp det. "Om" i stället för "inom" av samma skäl: "inom" kan läsas som ett fönster
+// som rymmer nu.
 
 function buildStoreRow(input: V2Input): V2StoreRow {
   const { storeName, storeState, storeSelected, storesWithStock, storeStockCount } = input;
@@ -211,12 +217,12 @@ function buildStoreRow(input: V2Input): V2StoreRow {
 
   if (storeState === "pa_vag_in") {
     const when = formatArrival(STORE_LEAD.pa_vag_in!.days);
-    return { tone: "wait", text: `I lager hos ${storeName} från ${when}`, action };
+    return { tone: "wait", text: `Åter i lager hos ${storeName} från ${when}`, action };
   }
 
   if (storeState === "bestalls") {
     const lead = storeLead(input.productType, "bestalls")!;
-    return { tone: "wait", text: `I lager hos ${storeName} inom ${lead.span}`, action };
+    return { tone: "wait", text: `Åter i lager hos ${storeName} om ${lead.span}`, action };
   }
 
   return { tone: "none", text: `Tillfälligt slut hos ${storeName}`, action };
