@@ -30,11 +30,9 @@ import {
   v2OnlineOptions,
   v2ProductOptions,
   v2StoreOptions,
-  v2SupplyOptions,
   type V2OnlineState,
   type V2ProductType,
   type V2StoreState,
-  type V2Supply,
 } from "@/lib/lagerstatus-v2";
 import { ClockIcon, LagerstatusBoxes } from "./status-card";
 import { StatusV2, SourceNote } from "./status-v2";
@@ -67,7 +65,6 @@ export function LagerstatusSimulator() {
   const [v2Type, setV2Type] = useState<V2ProductType>("mobler");
   const [v2StoreState, setV2StoreState] = useState<V2StoreState>("i_lager");
   const [v2OnlineState, setV2OnlineState] = useState<V2OnlineState>("i_lager");
-  const [v2Supply, setV2Supply] = useState<V2Supply>("direkt");
   const [v2StoreSelected, setV2StoreSelected] = useState(true);
   // En enda växel: går varan att leverera eller inte. Hem kontra ombud är ett kassabeslut
   // och syns därför inte i statusen.
@@ -112,8 +109,6 @@ export function LagerstatusSimulator() {
     productType: v2Type,
     storeState: v2StoreState,
     onlineState: v2OnlineState,
-    // Outlet säljs bara i butik – försörjningsvägen är då inte ett val.
-    supply: v2Type === "outlet" ? "via_butik" : v2Supply,
     storeSelected: v2StoreSelected,
     storeName: v2Store?.name ?? STORE_NAME,
     storesWithStock: storesWithStockCount,
@@ -150,7 +145,6 @@ export function LagerstatusSimulator() {
             type={v2Type}
             storeState={v2StoreState}
             onlineState={v2OnlineState}
-            supply={v2Supply}
             storeSelected={v2StoreSelected}
             deliverable={v2Deliverable}
             otherStores={v2OtherStores}
@@ -159,7 +153,6 @@ export function LagerstatusSimulator() {
             onType={setV2Type}
             onStoreState={setV2StoreState}
             onOnlineState={setV2OnlineState}
-            onSupply={setV2Supply}
             onStoreSelected={setV2StoreSelected}
             onDeliverable={setV2Deliverable}
             onOtherStores={setV2OtherStores}
@@ -438,7 +431,6 @@ function V2Controls({
   type,
   storeState,
   onlineState,
-  supply,
   storeSelected,
   deliverable,
   otherStores,
@@ -447,7 +439,6 @@ function V2Controls({
   onType,
   onStoreState,
   onOnlineState,
-  onSupply,
   onStoreSelected,
   onDeliverable,
   onOtherStores,
@@ -457,7 +448,6 @@ function V2Controls({
   type: V2ProductType;
   storeState: V2StoreState;
   onlineState: V2OnlineState;
-  supply: V2Supply;
   storeSelected: boolean;
   deliverable: boolean;
   otherStores: boolean;
@@ -466,7 +456,6 @@ function V2Controls({
   onType: (v: V2ProductType) => void;
   onStoreState: (v: V2StoreState) => void;
   onOnlineState: (v: V2OnlineState) => void;
-  onSupply: (v: V2Supply) => void;
   onStoreSelected: (v: boolean) => void;
   onDeliverable: (v: boolean) => void;
   onOtherStores: (v: boolean) => void;
@@ -510,17 +499,6 @@ function V2Controls({
             disabled={isOutlet}
             options={v2OnlineOptions}
             onChange={(v) => onOnlineState(v as V2OnlineState)}
-          />
-        </div>
-        {/* "Endast via butik" är dagens directToCustomer=av. I v2 döljer den ingenting –
-            den byter bara källa för datumet, vilket är hela poängen. */}
-        <div className={isOutlet ? "opacity-40 pointer-events-none" : ""}>
-          <SelectField
-            label="Försörjning"
-            value={supply}
-            disabled={isOutlet}
-            options={v2SupplyOptions}
-            onChange={(v) => onSupply(v as V2Supply)}
           />
         </div>
       </div>

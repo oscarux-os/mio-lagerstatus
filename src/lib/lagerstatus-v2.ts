@@ -11,8 +11,10 @@
 // "online" kanalen hen står i, inte ett lager – så "slut online" läses som "går inte att
 // köpa här" även när varan går alldeles utmärkt att få hem via butiken. Rad 2 påstår
 // därför ett datum, och vilken källa som försörjer datumet (centrallager eller butik) är
-// en ren backend-uträkning. Då blir "försörjs bara via butik" osynligt för kunden i
-// stället för ett tyst hål i gränssnittet.
+// en ren backend-uträkning: modellen väljer snabbaste trovärdiga vägen av centrallagret och
+// butiken, och kunden ser bara resultatet. Därför behöver komponenten ingen motsvarighet till
+// dagens directToCustomer – att en vara bara kan försörjas via butik yttrar sig som en annan
+// ledtid, inte som en dold ruta.
 //
 // Inga antal visas någonstans – saldosiffror blir fel i samma sekund som någon handlar i
 // butiken, och datumet bär redan all information siffran skulle gett.
@@ -27,10 +29,6 @@ export type V2StoreState = "i_lager" | "pa_vag_in" | "bestalls" | "slut" | "ej_i
 
 // Centrallagrets läge. Exponeras aldrig i kundtext – används bara för att räkna fram datum.
 export type V2OnlineState = "i_lager" | "pa_vag_in" | "tillverkas" | "slut";
-
-// Hur ett köp på sajten försörjs. "via_butik" = DI → butik → kund (dagens directToCustomer=av).
-// Kunden ser ingen skillnad; den styr bara vilket datum rad 2 landar på.
-export type V2Supply = "direkt" | "via_butik";
 
 export type V2Tone = "ok" | "wait" | "none";
 
@@ -69,7 +67,6 @@ export type V2Input = {
   productType: V2ProductType;
   storeState: V2StoreState;
   onlineState: V2OnlineState;
-  supply: V2Supply;
   storeSelected: boolean;
   storeName: string;
   // Antal butiker med saldo – används bara i texten när ingen butik är vald.
@@ -250,11 +247,9 @@ type Route = { lead: Lead; source: "onlinelager" | "butik" };
 function resolveRoute(input: V2Input): Route | null {
   const routes: Route[] = [];
 
-  if (input.supply === "direkt") {
-    const lead = ONLINE_LEAD[input.onlineState];
-    if (lead !== null) {
-      routes.push({ lead, source: "onlinelager" });
-    }
+  const online = ONLINE_LEAD[input.onlineState];
+  if (online !== null) {
+    routes.push({ lead: online, source: "onlinelager" });
   }
 
   // Butiksvägen finns så snart någon butik kan försörja – vald butik om den har ett läge,
@@ -328,8 +323,7 @@ function describeSource(input: V2Input, route: Route | null): string {
         ? `butikslagret i ${input.storeName}`
         : "butikslagret"
       : "centrallagret";
-  const direkt = input.supply === "via_butik" ? " (produkten kan inte skickas direkt från onlinelagret)" : "";
-  return `Datum från ${via}${direkt}`;
+  return `Datum från ${via}`;
 }
 
 // Prototypens "idag". Modulnivå så alla datum i en session hänger ihop.
@@ -372,7 +366,3 @@ export const v2OnlineOptions: { id: V2OnlineState; label: string }[] = [
   { id: "slut", label: "Ej tillgänglig" },
 ];
 
-export const v2SupplyOptions: { id: V2Supply; label: string }[] = [
-  { id: "direkt", label: "Direkt från onlinelagret" },
-  { id: "via_butik", label: "Endast via butik" },
-];
