@@ -19,7 +19,7 @@
 
 import { STORES, type StoreState } from "./lagerstatus";
 
-export type V2ProductType = "snabb" | "mobler" | "outlet";
+export type V2ProductType = "snabb" | "mobler" | "lagervara" | "outlet";
 
 // Butikens läge. "ej_i_sortiment" är strukturellt (varan förs aldrig i butik) – skilt från
 // "slut" som är ett saldo som rör sig. Bara det strukturella får dölja raden.
@@ -78,8 +78,11 @@ export type V2Input = {
   // den direkt – då är en annan butik den snabbaste vägen och det ska synas utan att kunden
   // behöver öppna butikspanelen för att upptäcka det.
   otherStoresWithStock: number;
-  // Knapphet som tröskel, aldrig som tal: ett exakt saldo blir fel i samma sekund som någon
-  // handlar i butiken, och "2 kvar" läses som ett löfte.
+  // Butikens hyllsaldo. 0 = okänt eller inget – då står raden utan antal.
+  storeStockCount: number;
+  // Visa knappheten som ord i stället för tal. Samma signal, två uttryck: antalet är
+  // konkret men blir fel i samma sekund som någon handlar i butiken, "Få kvar" åldras inte
+  // men säger mindre. Växeln finns för att kunna demonstrera båda.
   lowStock: boolean;
   postcode: string | null;
   // Går varan att leverera över huvud taget? Raden skiljer medvetet inte på hem och ombud:
@@ -128,6 +131,17 @@ const STORE_LEAD: Record<V2StoreState, Lead | null> = {
   ej_i_sortiment: null,
 };
 
+// En lagervara som butiken inte för själv tas dit från centrallagret, inte via en egen
+// leverantörsorder – det tar dagar i stället för veckor. Samma mening för kunden ("I lager
+// hos {butik} inom …"), bara ett annat spann. Det är hela skillnaden mot en möbel, och i v2
+// behöver den därför ingen egen produkttypsgren i copyn.
+const LAGERVARA_STORE_ORDER_LEAD: Lead = { days: 6, span: "4–6 dagar", weeks: false };
+
+function storeLead(productType: V2ProductType, state: V2StoreState): Lead | null {
+  if (state === "bestalls" && productType === "lagervara") return LAGERVARA_STORE_ORDER_LEAD;
+  return STORE_LEAD[state];
+}
+
 // --- Postnummer -------------------------------------------------------------
 
 export function normalizePostcode(raw: string): string | null {
@@ -165,7 +179,7 @@ export const storesWithStockCount = STORES.filter((store) => store.state === "i_
 // kategori och säger inte vad kunden får.
 
 function buildStoreRow(input: V2Input): V2StoreRow | null {
-  const { storeName, storeState, storeSelected, storesWithStock, lowStock } = input;
+  const { storeName, storeState, storeSelected, storesWithStock, storeStockCount, lowStock } = input;
 
   // Strukturellt nej: varan förs inte i butik alls. Raden döljs – men bara på den här
   // grunden, aldrig på ett saldo, så att produkten ser likadan ut mellan två besök.
@@ -189,11 +203,14 @@ function buildStoreRow(input: V2Input): V2StoreRow | null {
   const action: V2Action = { label: "Byt butik", kind: "stores" };
 
   if (storeState === "i_lager") {
-    // Knapphetssignalen ersätter "I lager" i stället för att läggas till – pricken är fortsatt
+    // Knapphetssignalen ersätter saldot i stället för att läggas till – pricken är fortsatt
     // grön, varan finns, men ordet säger att den kan vara borta imorgon.
+    if (lowStock) return { tone: "ok", text: `Få kvar hos ${storeName}`, action };
     return {
       tone: "ok",
-      text: lowStock ? `Få kvar hos ${storeName}` : `I lager hos ${storeName}`,
+      text: storeStockCount > 0
+        ? `${storeStockCount} st i lager hos ${storeName}`
+        : `I lager hos ${storeName}`,
       action,
     };
   }
@@ -204,11 +221,8 @@ function buildStoreRow(input: V2Input): V2StoreRow | null {
   }
 
   if (storeState === "bestalls") {
-    return {
-      tone: "wait",
-      text: `I lager hos ${storeName} inom ${STORE_LEAD.bestalls!.span}`,
-      action,
-    };
+    const lead = storeLead(input.productType, "bestalls")!;
+    return { tone: "wait", text: `I lager hos ${storeName} inom ${lead.span}`, action };
   }
 
   return { tone: "none", text: `Tillfälligt slut hos ${storeName}`, action };
@@ -245,13 +259,13 @@ function resolveRoute(input: V2Input): Route | null {
 
   // Butiksvägen finns så snart någon butik kan försörja – vald butik om den har ett läge,
   // annars kedjan generellt när det finns saldo ute i butikerna.
-  const storeLead = input.storeSelected
-    ? STORE_LEAD[input.storeState]
+  const viaStore = input.storeSelected
+    ? storeLead(input.productType, input.storeState)
     : input.storesWithStock > 0
       ? STORE_LEAD.i_lager
       : null;
-  if (storeLead !== null) {
-    routes.push({ lead: storeLead, source: "butik" });
+  if (viaStore !== null) {
+    routes.push({ lead: viaStore, source: "butik" });
   }
 
   if (routes.length === 0) return null;
@@ -336,6 +350,7 @@ export function getV2Status(input: V2Input): V2Result {
 export const v2ProductOptions: { id: V2ProductType; label: string }[] = [
   { id: "snabb", label: "Snabbrörlig" },
   { id: "mobler", label: "Möbler (större)" },
+  { id: "lagervara", label: "Lagervara (via butik)" },
   { id: "outlet", label: "Outlet (butiksexklusiv)" },
 ];
 

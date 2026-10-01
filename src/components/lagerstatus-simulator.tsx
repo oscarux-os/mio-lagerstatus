@@ -118,6 +118,8 @@ export function LagerstatusSimulator() {
     storeName: v2Store?.name ?? STORE_NAME,
     storesWithStock: storesWithStockCount,
     otherStoresWithStock: v2OtherStores ? OTHER_STORES_COUNT : 0,
+    // Mock-butiker utan saldo har 0 – då faller raden tillbaka på "I lager hos {butik}".
+    storeStockCount: v2Store?.stockCount || 4,
     lowStock: v2LowStock,
     postcode: v2Postcode,
     // Outlet är butiksexklusiv – då finns ingen leveransväg alls.
@@ -549,7 +551,7 @@ function V2Controls({
         />
         <CheckRow
           checked={lowStock}
-          label="Få kvar i vald butik"
+          label="Visa &quot;Få kvar&quot; i stället för antal"
           onChange={() => onLowStock(!lowStock)}
         />
         <p className="text-xs leading-5 text-[#8a8a85] mt-1">
