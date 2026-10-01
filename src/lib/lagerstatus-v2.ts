@@ -40,6 +40,7 @@ export type V2Action = {
 export type V2StoreRow = {
   tone: V2Tone;
   text: string;
+  // Saknas när det inte finns något att välja mellan – varan förs inte i butik alls.
   action?: V2Action;
 };
 
@@ -52,7 +53,7 @@ export type V2DeliveryRow = {
 };
 
 export type V2Result = {
-  store: V2StoreRow | null;
+  store: V2StoreRow;
   delivery: V2DeliveryRow;
   // Länk under båda raderna. Bor utanför raderna eftersom den gäller ett alternativ till
   // hela situationen, inte en detalj i butiksraden – och för att action-platsen i raden ska
@@ -77,10 +78,6 @@ export type V2Input = {
   otherStoresWithStock: number;
   // Butikens hyllsaldo. 0 = okänt eller inget – då står raden utan antal.
   storeStockCount: number;
-  // Visa knappheten som ord i stället för tal. Samma signal, två uttryck: antalet är
-  // konkret men blir fel i samma sekund som någon handlar i butiken, "Få kvar" åldras inte
-  // men säger mindre. Växeln finns för att kunna demonstrera båda.
-  lowStock: boolean;
   postcode: string | null;
   // Går varan att leverera över huvud taget? Raden skiljer medvetet inte på hem och ombud:
   // "Levereras" täcker båda, valet mellan dem är ett kassabeslut, och ett enda verb gör att
@@ -175,12 +172,15 @@ export const storesWithStockCount = STORES.filter((store) => store.state === "i_
 // beställs dit. Lagerläget i sig (på väg in, beställningsläge) nämns aldrig; det är systemets
 // kategori och säger inte vad kunden får.
 
-function buildStoreRow(input: V2Input): V2StoreRow | null {
-  const { storeName, storeState, storeSelected, storesWithStock, storeStockCount, lowStock } = input;
+function buildStoreRow(input: V2Input): V2StoreRow {
+  const { storeName, storeState, storeSelected, storesWithStock, storeStockCount } = input;
 
-  // Strukturellt nej: varan förs inte i butik alls. Raden döljs – men bara på den här
-  // grunden, aldrig på ett saldo, så att produkten ser likadan ut mellan två besök.
-  if (storeState === "ej_i_sortiment") return null;
+  // Varan förs inte i butik alls – t.ex. en onlineexklusiv snabbrörlig artikel. Raden står
+  // kvar och säger det rakt ut: en tom plats där en butiksrad brukar stå läses som att vi
+  // glömt svara, och frågan "finns den i min butik?" ställs ändå.
+  if (storeState === "ej_i_sortiment") {
+    return { tone: "none", text: "Säljs inte i butik" };
+  }
 
   if (!storeSelected) {
     if (storesWithStock > 0) {
@@ -200,9 +200,6 @@ function buildStoreRow(input: V2Input): V2StoreRow | null {
   const action: V2Action = { label: "Byt butik", kind: "stores" };
 
   if (storeState === "i_lager") {
-    // Knapphetssignalen ersätter saldot i stället för att läggas till – pricken är fortsatt
-    // grön, varan finns, men ordet säger att den kan vara borta imorgon.
-    if (lowStock) return { tone: "ok", text: `Få kvar hos ${storeName}`, action };
     return {
       tone: "ok",
       text: storeStockCount > 0

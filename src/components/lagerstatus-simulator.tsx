@@ -72,7 +72,6 @@ export function LagerstatusSimulator() {
   // Andra butiker med varan på hyllan just nu – egen växel, det följer inte av den valda
   // butikens läge.
   const [v2OtherStores, setV2OtherStores] = useState(true);
-  const [v2LowStock, setV2LowStock] = useState(false);
   const [v2Postcode, setV2Postcode] = useState<string | null>(null);
   const [v2Store, setV2Store] = useState<StoreInfo | undefined>(DEFAULT_STORE);
 
@@ -115,7 +114,6 @@ export function LagerstatusSimulator() {
     otherStoresWithStock: v2OtherStores ? OTHER_STORES_COUNT : 0,
     // Mock-butiker utan saldo har 0 – då faller raden tillbaka på "I lager hos {butik}".
     storeStockCount: v2Store?.stockCount || 4,
-    lowStock: v2LowStock,
     postcode: v2Postcode,
     // Outlet är butiksexklusiv – då finns ingen leveransväg alls.
     deliverable: v2Type === "outlet" ? false : v2Deliverable,
@@ -148,7 +146,6 @@ export function LagerstatusSimulator() {
             storeSelected={v2StoreSelected}
             deliverable={v2Deliverable}
             otherStores={v2OtherStores}
-            lowStock={v2LowStock}
             postcode={v2Postcode}
             onType={setV2Type}
             onStoreState={setV2StoreState}
@@ -156,7 +153,6 @@ export function LagerstatusSimulator() {
             onStoreSelected={setV2StoreSelected}
             onDeliverable={setV2Deliverable}
             onOtherStores={setV2OtherStores}
-            onLowStock={setV2LowStock}
             onPostcode={setV2Postcode}
           />
         ) : (
@@ -434,7 +430,6 @@ function V2Controls({
   storeSelected,
   deliverable,
   otherStores,
-  lowStock,
   postcode,
   onType,
   onStoreState,
@@ -442,7 +437,6 @@ function V2Controls({
   onStoreSelected,
   onDeliverable,
   onOtherStores,
-  onLowStock,
   onPostcode,
 }: {
   type: V2ProductType;
@@ -451,7 +445,6 @@ function V2Controls({
   storeSelected: boolean;
   deliverable: boolean;
   otherStores: boolean;
-  lowStock: boolean;
   postcode: string | null;
   onType: (v: V2ProductType) => void;
   onStoreState: (v: V2StoreState) => void;
@@ -459,7 +452,6 @@ function V2Controls({
   onStoreSelected: (v: boolean) => void;
   onDeliverable: (v: boolean) => void;
   onOtherStores: (v: boolean) => void;
-  onLowStock: (v: boolean) => void;
   onPostcode: (v: string | null) => void;
 }) {
   const isOutlet = type === "outlet";
@@ -526,11 +518,6 @@ function V2Controls({
           checked={otherStores}
           label="Finns nu i andra butiker"
           onChange={() => onOtherStores(!otherStores)}
-        />
-        <CheckRow
-          checked={lowStock}
-          label="Visa &quot;Få kvar&quot; i stället för antal"
-          onChange={() => onLowStock(!lowStock)}
         />
         <p className="text-xs leading-5 text-[#8a8a85] mt-1">
           Postnummer som börjar på 98 ligger utanför hemleveransområdet — skriv t.ex. 981 99 i
