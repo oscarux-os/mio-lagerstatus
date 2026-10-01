@@ -189,7 +189,7 @@ export function StatusV2({
         className="bg-white w-full p-4 flex flex-col gap-3 border"
         style={{ borderColor: "var(--border-subtle)" }}
       >
-      <StoreRowView row={result.store} onAction={handleAction} />
+      {result.store && <StoreRowView row={result.store} onAction={handleAction} />}
       {editingPostcode ? (
         <PostcodeField
           value={postcode}

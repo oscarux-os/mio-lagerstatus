@@ -34,7 +34,7 @@ export type V2Tone = "ok" | "wait" | "none";
 
 export type V2Action = {
   label: string;
-  kind: "stores" | "postcode" | "notify";
+  kind: "stores" | "postcode";
 };
 
 export type V2StoreRow = {
@@ -53,7 +53,9 @@ export type V2DeliveryRow = {
 };
 
 export type V2Result = {
-  store: V2StoreRow;
+  // null i det enda läge där varan inte går att få på något sätt – då ersätts båda raderna av
+  // ett besked. Ingen butiksrad att byta i, ingen leverans att ange postnummer för.
+  store: V2StoreRow | null;
   delivery: V2DeliveryRow;
   // Länk under båda raderna. Bor utanför raderna eftersom den gäller ett alternativ till
   // hela situationen, inte en detalj i butiksraden – och för att action-platsen i raden ska
@@ -280,12 +282,10 @@ function buildDeliveryRow(input: V2Input, route: Route | null): V2DeliveryRow {
     };
   }
 
+  // Leveransvägen är stängd, men varan finns på hyllan i någon annan butik – footer-länken bär
+  // vägen vidare, så raden behöver bara konstatera att det inte går att få den hemskickad.
   if (route === null) {
-    return {
-      tone: "none",
-      text: "Går inte att köpa just nu",
-      action: { label: "Meddela mig när den finns", kind: "notify" },
-    };
+    return { tone: "none", text: "Går inte att leverera just nu" };
   }
 
   if (!input.postcode) {
@@ -332,8 +332,30 @@ function describeSource(input: V2Input, route: Route | null): string {
 // Prototypens "idag". Modulnivå så alla datum i en session hänger ihop.
 const TODAY = new Date();
 
+// Varken butiken, någon annan butik eller en leveransväg kan ge varan. Då räcker ett besked:
+// varje länk i det läget leder till ett nej till, och "meddela mig" är ett löfte om ett mejl
+// som ingen bad om.
+function isUnavailable(input: V2Input, route: Route | null): boolean {
+  const viaStore = input.storeSelected
+    ? input.storeState === "i_lager" ||
+      input.storeState === "pa_vag_in" ||
+      input.storeState === "bestalls"
+    : input.storesWithStock > 0;
+  return !viaStore && input.otherStoresWithStock < 1 && !(input.deliverable && route !== null);
+}
+
 export function getV2Status(input: V2Input): V2Result {
   const route = resolveRoute(input);
+
+  if (isUnavailable(input, route)) {
+    return {
+      store: null,
+      delivery: { tone: "none", text: "Produkten går inte att köpa" },
+      footerLink: null,
+      source: "Ingen väg till köp finns",
+    };
+  }
+
   return {
     store: buildStoreRow(input),
     delivery: buildDeliveryRow(input, route),
