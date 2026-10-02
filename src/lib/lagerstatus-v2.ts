@@ -30,7 +30,10 @@ export type V2StoreState = "i_lager" | "pa_vag_in" | "bestalls" | "slut" | "ej_i
 // Centrallagrets läge. Exponeras aldrig i kundtext – används bara för att räkna fram datum.
 export type V2OnlineState = "i_lager" | "pa_vag_in" | "tillverkas" | "slut";
 
-export type V2Tone = "ok" | "wait" | "none";
+// "order" är varken finns-nu eller på-ingång: varan kommer, men först när kunden beställer
+// den. Egen ton i stället för "none" eftersom den tonen gråar ut texten – rätt för ett nej,
+// fel för en vara som går alldeles utmärkt att köpa.
+export type V2Tone = "ok" | "wait" | "order" | "none";
 
 export type V2Action = {
   label: string;
@@ -169,10 +172,18 @@ export const storesWithStockCount = STORES.filter((store) => store.state === "i_
 
 // --- Rad 1: butik -----------------------------------------------------------
 //
-// En enda formulering med en tidsangivelse som varierar: inget tillägg när varan står på
-// hyllan, "från {datum}" när en inleverans är lagd, "om {spann}" när den beställs dit.
-// Lagerläget i sig (på väg in, beställningsläge) nämns aldrig; det är systemets kategori och
-// säger inte vad kunden får.
+// Raden har två meningsformer, därför att butikslägena är två olika sorters påstående:
+//
+//   Observation  – hyllan nu eller en lagd inleverans. "I lager hos {butik}", "Åter i lager
+//                  hos {butik} från {datum}". Gäller oavsett vad kunden gör.
+//   Villkor      – beställningsläge. Ingenting är på väg; spannet börjar räknas när kunden
+//                  beställer. "Beställningsvara till {butik} — {spann}".
+//
+// Att ge båda samma form ("Åter i lager hos {butik} om {spann}") var v2:s dyraste bugg: den
+// påstod ett framtida hylltillstånd som aldrig inträffar, och läses som "då väntar jag och
+// åker dit sen" – varpå kunden inte köper, och inget händer. Lagerläget som systemord nämns
+// fortfarande aldrig i observationsformen; "beställningsvara" står kvar i villkorsformen
+// eftersom det är ordet kunden själv använder för just den affären.
 //
 // De väntande lägena inleds med "Åter" i stället för att bara få ett tillägg på slutet. Utan
 // det ordet står "I lager hos {butik}" först i meningen och det som vänder betydelsen sist –
@@ -224,7 +235,9 @@ function buildStoreRow(input: V2Input): V2StoreRow {
 
   if (storeState === "bestalls") {
     const lead = storeLead(input.productType, "bestalls")!;
-    return { tone: "wait", text: `Åter i lager hos ${storeName} om ${lead.span}`, action };
+    // Klockan ryker med texten: den betyder "på ingång" i hela komponenten, och ingenting är
+    // på ingång här. Ikonen ensam skulle återinföra precis den läsning meningen rättar.
+    return { tone: "order", text: `Beställningsvara till ${storeName} — ${lead.span}`, action };
   }
 
   return { tone: "none", text: `Tillfälligt slut hos ${storeName}`, action };
