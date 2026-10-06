@@ -27,6 +27,8 @@ import { ClockIcon } from "./status-card";
 function toneColor(tone: V2Tone): string {
   if (tone === "ok") return "var(--text)";
   if (tone === "wait") return "var(--text)";
+  // "order" får full textfärg – varan går att köpa. Bara "none" gråas ut, och det är ett nej.
+  if (tone === "order") return "var(--text)";
   return "var(--muted-foreground)";
 }
 
